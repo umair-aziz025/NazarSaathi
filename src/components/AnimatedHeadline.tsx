@@ -28,15 +28,14 @@ function AnimatedSegment({ text, className = '', delay, reducedMotion }: Animate
                 key={characterIndex}
                 style={{ transformOrigin: '50% 100%' } as CSSProperties}
                 initial={reducedMotion ? false : {
-                  opacity: 0,
-                  y: 30,
-                  rotateX: -55,
-                  filter: 'blur(7px)',
+                  opacity: 0.58,
+                  y: 16,
+                  rotateX: -18,
                 }}
-                animate={{ opacity: 1, y: 0, rotateX: 0, filter: 'blur(0px)' }}
+                animate={{ opacity: 1, y: 0, rotateX: 0 }}
                 transition={reducedMotion ? { duration: 0 } : {
-                  delay: delay + (firstCharacter + characterIndex) * 0.038,
-                  duration: 0.72,
+                  delay: delay + (firstCharacter + characterIndex) * 0.043,
+                  duration: 0.65,
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
@@ -74,13 +73,15 @@ export default function AnimatedHeadline() {
           delay={0.83}
           reducedMotion={reducedMotion}
         />
-        <AnimatedSegment
-          text="world."
-          className="title-accent headline-glow"
-          delay={1.18}
-          reducedMotion={reducedMotion}
-        />
-        <span className="headline-underline" aria-hidden="true" />
+        <span className="headline-accent-wrap">
+          <AnimatedSegment
+            text="world."
+            className="title-accent headline-glow"
+            delay={1.18}
+            reducedMotion={reducedMotion}
+          />
+          <span className="headline-underline" aria-hidden="true" />
+        </span>
       </span>
     </h1>
   );

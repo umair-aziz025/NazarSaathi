@@ -1,117 +1,125 @@
-/* Staggered cinematic hero title, reusable with all NazarSaathi themes. */
-.animated-headline {
+/* Every letter remains visible even before its individual reveal.
+   The accent uses solid foreground color: background-clip:text on a parent
+   with animated child spans made "world." disappear in Chromium. */
+.hero .animated-headline {
   position: relative;
-  line-height: 1.16;
+  font-size: clamp(35px, 4vw, 62px);
+  letter-spacing: -0.045em;
+  line-height: 1.19;
   isolation: isolate;
+  max-width: 100%;
+  overflow: visible;
 }
+.hero .hero-copy { min-width: 0; }
 .animated-headline .headline-line {
   display: block;
   max-width: 100%;
 }
-.animated-headline .headline-line-second {
-  position: relative;
-}
-.animated-headline .headline-segment {
-  display: inline;
-}
+.animated-headline .headline-line-second { position: relative; }
+.animated-headline .headline-segment { display: inline; }
 .animated-headline .headline-word {
   display: inline-block;
   white-space: nowrap;
+  vertical-align: baseline;
 }
 .animated-headline .headline-letter {
   display: inline-block;
-  backface-visibility: hidden;
-  transform-style: preserve-3d;
+  color: inherit;
+  backface-visibility: visible;
+  transform-style: flat;
+  will-change: auto;
 }
 .animated-headline .headline-space {
   display: inline-block;
-  width: .26em;
+  width: .245em;
 }
 .animated-headline .headline-line-second > .title-light {
-  margin-right: .26em;
+  margin-right: .25em;
 }
-.animated-headline .headline-glow {
+.animated-headline .headline-accent-wrap {
+  display: inline-block;
   position: relative;
   white-space: nowrap;
-  --headline-a: #61d8c4;
-  --headline-b: #b4ffdf;
-  --headline-c: #65bcd8;
-  background: linear-gradient(
-    110deg,
-    var(--headline-a) 4%,
-    var(--headline-b) 36%,
-    var(--headline-c) 65%,
-    var(--headline-a) 94%
-  );
-  background-size: 250% 100%;
-  background-position: 100% 50%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 13px rgba(52, 207, 174, .18));
-  animation: headline-glint 7.5s ease-in-out 2.4s infinite;
+  padding-bottom: .09em;
+}
+.animated-headline .headline-glow {
+  color: #73e7d1;
+  position: relative;
+  -webkit-text-fill-color: currentColor;
+  text-shadow: 0 0 17px rgba(58, 219, 189, .25);
+  animation: headline-luminous 6s ease-in-out 2s infinite;
 }
 .animated-headline .headline-glow .headline-letter {
   color: inherit;
+  -webkit-text-fill-color: currentColor;
 }
-html[data-theme="daylight"] .headline-glow {
-  --headline-a: #00675f;
-  --headline-b: #168276;
-  --headline-c: #006c98;
-  filter: drop-shadow(0 2px 6px rgba(2, 108, 92, .1));
+html[data-theme="daylight"] .animated-headline .headline-glow {
+  color: #087367;
+  text-shadow: 0 0 12px rgba(8,115,103,.14);
 }
-html[data-theme="sea-glass"] .headline-glow {
-  --headline-a: #075e4d;
-  --headline-b: #2d9177;
-  --headline-c: #176c88;
-  filter: drop-shadow(0 2px 6px rgba(19, 109, 83, .1));
+html[data-theme="sea-glass"] .animated-headline .headline-glow {
+  color: #126756;
+  text-shadow: 0 0 12px rgba(18,103,86,.16);
 }
-html[data-theme="midnight"] .headline-glow {
-  --headline-a: #61d8c4;
-  --headline-b: #c5ffe4;
-  --headline-c: #86d6ee;
+html[data-theme="midnight"] .animated-headline .headline-glow {
+  color: #73e7d1;
 }
-html[data-theme="contrast"] .headline-glow {
-  --headline-a: #fff2aa;
-  --headline-b: #ffffff;
-  --headline-c: #ffec81;
-  filter: none;
+html[data-theme="contrast"] .animated-headline .headline-glow {
+  color: #fff0aa;
+  text-shadow: none;
 }
 .animated-headline .headline-underline {
   position: absolute;
-  width: clamp(76px, 30%, 168px);
+  display: block;
   height: 3px;
-  right: 1%;
-  bottom: -7px;
+  width: 88%;
+  left: 6%;
+  bottom: .005em;
+  background: linear-gradient(90deg,transparent,currentColor,transparent);
+  color: #4dcab0;
+  opacity: .76;
   border-radius: 50px;
-  background: linear-gradient(90deg, transparent, var(--accent, #62e3cf), transparent);
-  transform-origin: left center;
-  transform: scaleX(0);
-  opacity: .72;
-  animation: headline-underline-reveal .92s cubic-bezier(.22,1,.36,1) 1.8s forwards;
   pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: center;
+  animation: underline-reveal .8s cubic-bezier(.22,1,.36,1) 1.95s forwards;
 }
-@keyframes headline-glint {
-  0%, 18%, 100% { background-position: 100% 50%; }
-  47%, 63% { background-position: 0% 50%; }
+html[data-theme="daylight"] .headline-underline,
+html[data-theme="sea-glass"] .headline-underline {color:#087367;}
+html[data-theme="contrast"] .headline-underline {color:#ffec81;}
+@keyframes headline-luminous {
+  0%,100% {text-shadow:0 0 8px rgba(58,219,189,.13);}
+  48% {text-shadow:0 0 22px rgba(58,219,189,.37);}
 }
-@keyframes headline-underline-reveal {
-  to { transform: scaleX(1); }
+@keyframes underline-reveal {to{transform:scaleX(1)}}
+/* Give the text column enough space on laptop widths. */
+@media (min-width: 901px) {
+  .hero { grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); gap: 16px; }
 }
-@media (max-width: 780px) {
-  .animated-headline { line-height: 1.19; }
-  .animated-headline .headline-underline { bottom: -4px; right: 4%; }
+@media (max-width: 1050px) {
+  .hero .animated-headline { font-size: clamp(34px, 4.3vw, 48px); }
 }
-@media (max-width: 410px) {
-  .animated-headline .headline-letter { letter-spacing: -.01em; }
-  .animated-headline .headline-space { width: .24em; }
-  .animated-headline .headline-line-second > .title-light { margin-right: .2em; }
+@media (max-width: 900px) {
+  .hero { grid-template-columns: minmax(0, 1fr); }
+  .hero .hero-copy { max-width: 100%; }
+  .hero .animated-headline { font-size: clamp(34px, 6.8vw, 54px); }
+  .hero-visual {max-width:100%;justify-self:center;}
 }
-@media (prefers-reduced-motion: reduce) {
-  .animated-headline .headline-glow { animation: none !important; }
-  .animated-headline .headline-underline {
-    animation: none !important;
-    transform: scaleX(1) !important;
+@media (max-width: 560px) {
+  .hero .animated-headline {
+    font-size: clamp(30px, 7.8vw, 40px);
+    letter-spacing: -.045em;
+    line-height: 1.23;
   }
-  .animated-headline .headline-letter { filter: none !important; }
+  .animated-headline .headline-line-second > .title-light { margin-right: .19em; }
+  .animated-headline .headline-space { width: .22em; }
+}
+@media (max-width: 350px) {
+  .hero .animated-headline { font-size: 29px; letter-spacing: -.05em; }
+}
+/* Users requesting less motion see a complete, stable headline. */
+@media (prefers-reduced-motion: reduce) {
+  .animated-headline .headline-glow {animation:none !important;}
+  .animated-headline .headline-underline {animation:none !important;transform:scaleX(1) !important;}
+  .animated-headline .headline-letter {transform:none !important;filter:none !important;}
 }
