@@ -1,34 +1,48 @@
-# NazarSaathi
+# NazarSaathi 2.0 — Live Vision & Bilingual Voice Assistant
 
-Live bilingual vision assistant prototype.
+Modern React + TypeScript accessibility research prototype for Urdu and English speakers.
 
-**Website:** https://nazarsaathi-web-production.up.railway.app/
+**Live demo:** https://nazarsaathi-web-production.up.railway.app/
 
-## Features
-- Live object detection with TensorFlow.js and COCO-SSD
-- Urdu/English text-to-speech and language selector
-- Browser speech commands (describe current scene, find supported objects, read text)
-- English/Urdu OCR using Tesseract.js
-- Demo QR checkpoints using jsQR
+## Technology
+- React 19, TypeScript, Vite 6
+- Lucide icons, Framer Motion animation, custom accessible responsive design
+- TensorFlow.js + COCO-SSD for live in-browser object detection
+- Tesseract.js for English and Urdu OCR
+- Web Speech API for optional browser voice commands
+- Urdu/English speech synthesis; Urdu may fall back to an online speech relay
+- QR demo checkpoints
+- Bun server and Railway Docker deployment
 
-## Start
-Install Bun, then run `bun run start` and visit http://localhost:3000.
+## Development
+```sh
+npm install
+npm run dev
+```
+Open http://localhost:5173 for frontend development. The development server does not proxy the Urdu TTS endpoint; run the production server to test the full experience.
 
-## Repository layout
-- `public/index.html`: interface
-- `public/styles.css`: design
-- `public/app.js`: camera, object detection, OCR, audio, voice commands
-- `src/server.ts`: Bun server, static files and Urdu speech relay
-- `deploy/railway-function.ts`: **exact snapshot of the deployed Railway Function** (source of truth at export time)
-- `Dockerfile`, `railway.json`: Railway deployment configuration
+## Production
+```sh
+npm install
+npm run build
+bun run start
+```
+Open http://localhost:3000.
 
-**Important:** The original live Railway service is a Function. Changes pushed to this repository do not automatically modify that Function. For continuous deployment, create a separate GitHub-connected service and validate it before switching domains.
+## Structure
+- `src/App.tsx` — modern React interface
+- `src/App.css` — responsive styles, visual effects and typography
+- `src/engine.ts` — migrated TypeScript device/AI engine; imperative interfaces retained for compatibility
+- `src/main.tsx` — React bootstrap
+- `server/index.ts` — Bun static server and Urdu text-to-speech relay
+- `index.html` — Vite entry point and model CDN scripts
+- `Dockerfile`, `railway.json` — deployment definition
+- `deploy/railway-function.ts` — previous Railway Function snapshot for rollback/reference
 
-## Browser prerequisites
-Camera and microphone access require a secure origin (HTTPS, except localhost). SpeechRecognition support depends on browser and device; Chrome on Android is recommended. AI model downloads and speech recognition may require internet.
+## Deployment
+The previous live application ran as a Railway Function. The new React+TypeScript application requires a repository-based Railway Docker service. Deploy the `main` branch, verify `/api/health`, and only then migrate the public hostname. Keep the old service for rollback until the new one passes browser tests.
 
-## Privacy
-Images are processed on the client; libraries and AI weights download from third-party CDNs. Urdu audio may use an **unofficial Google Translate TTS endpoint** via the backend, and microphone recognition may use external browser-provider speech services. This is not an offline-only service.
+## Limitations and safety
+**This is NOT a navigation or hazard-safety device.** Do not rely on object detections to decide whether a path or road is safe, and do not use as a substitute for a cane, guide dog, or trained human support. The QR demo represents fictional locations, not a validated building map.
 
-## Safety
-**Not an independent mobility or navigation aid.** Object detection is incomplete and can be wrong; do not rely on this prototype to identify hazards or judge when to walk or cross roads. Checkpoint locations are fictional demonstration data, not mapped MUST routes. It has not undergone accessibility user testing or safety certification.
+Speech recognition support varies by browser and may require a third-party cloud provider. Urdu audio fallback currently relies on an unofficial external TTS endpoint and could fail. Camera imagery is processed in-browser, but models and language assets download from public CDNs.
