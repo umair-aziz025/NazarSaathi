@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#08182c"><title>NazarSaathi | AI Vision for Everyone</title>
+<link rel="stylesheet" href="/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js" defer></script>
+</head><body>
+<a href="#main" style="position:absolute;left:-999px" onfocus="this.style.left='12px'">Skip to application</a>
+<div class="wrapper"><header class="top"><div class="brand"><div class="logo" aria-hidden="true">◉</div><div>Nazar<em>Saathi</em><small>نظرساتھی · ACCESSIBILITY LAB</small></div></div><div class="status">● Public demo · Browser AI</div></header>
+<main id="main"><section class="hero"><div class="eyebrow">AI FOR ACCESSIBILITY · URDU + ENGLISH</div><h1>Understand your world.<br><span>In your language.</span></h1><p>Use your phone camera to recognize everyday objects, read printed text, and locate demo campus checkpoints. Built as an accessible research prototype for Pakistani communities.</p><div class="pills"><div class="pill">📷 Camera-ready</div><div class="pill">🔈 Spoken feedback</div><div class="pill">🇵🇰 Urdu + English</div><div class="pill">🔒 Live camera stays on device</div></div></section>
+<div class="warning"><strong>Prototype only:</strong> This is not an autonomous mobility aid. Do not use its object labels or checkpoint messages to navigate traffic, avoid hazards, or make safety-critical decisions. An internet connection is required to load AI libraries and models.</div>
+<div class="layout"><section class="panel"><div class="step">01 · CAMERA & INPUT</div><h2>Choose what you'd like to do</h2><div class="modes">
+<button class="mode" data-mode="look" aria-pressed="true" type="button"><span class="ico">◉</span><strong>Look & Listen</strong><small>Common objects</small></button>
+<button class="mode" data-mode="read" aria-pressed="false" type="button"><span class="ico">▤</span><strong>Read for Me</strong><small>Printed text</small></button>
+<button class="mode" data-mode="guide" aria-pressed="false" type="button"><span class="ico">◇</span><strong>Campus Checkpoints</strong><small>QR demo</small></button></div>
+<div class="heading" id="modeHeading">Look & Listen</div><div class="hint" id="modeHint">Start the live camera to detect objects continuously, or upload a photo.</div>
+
+
+<section class="assist" aria-label="Hands free voice assistant">
+<h3>🎙 NazarSaathi Voice Assistant</h3><p>Ask what the camera sees, find an object, or read text. For first use, start the assistant and allow camera and microphone.</p>
+<div class="lanrow"><label for="speechLanguage">Speaking language</label><select id="speechLanguage" aria-label="Speaking language"><option value="ur" selected>اردو · Urdu</option><option value="en">English</option></select></div>
+<button id="assistantToggle" type="button" class="assistbtn" aria-pressed="false">🎙 Start Hands-Free Assistant</button>
+<div class="micstate" role="status" aria-live="polite" id="micStatus">Microphone is off. Tap once to begin listening.</div>
+<div id="voiceExamples" class="excommands"><b>Say:</b> “NazarSaathi, what is in front of me?”<div>“Where is my bottle?” · “Read this”</div><div>“Speak Urdu” · “Speak English” · “Help”</div></div>
+<form id="voiceForm" class="assistform"><label class="srOnly" for="commandInput">Ask NazarSaathi</label><input id="commandInput" type="text" placeholder="Or type a command" autocomplete="off"><button type="submit">Ask</button></form>
+<p>Browser speech recognition may require internet and may not work continuously on every phone. This app is not a safe navigation or obstacle-avoidance aid.</p>
+</section>
+<div class="live-intro"><span class="live-pill"><span class="live-dot"></span> LIVE VISION</span><span>Continuous camera detection, no photo needed</span></div>
+<button id="startLive" type="button" class="live-action">◉ Start Live Camera</button>
+<div class="live-options"><label for="cameraSide">Camera <select id="cameraSide"><option value="environment">Back camera</option><option value="user">Front camera</option></select></label><label for="speechLive"><input id="speechLive" type="checkbox" checked> Speak detected objects</label></div>
+<div class="camera-shell" id="liveBox" hidden><video id="liveVideo" autoplay playsinline muted aria-label="Live camera image with object detections"></video><canvas id="liveOverlay" aria-hidden="true"></canvas><span class="camera-info" id="cameraLabel">● LIVE · Starting...</span><span class="cam-bottom" id="liveCount">Starting...</span></div>
+<div class="live-buttons" id="liveButtons" hidden><button type="button" id="captureFrame">Capture &amp; analyze frame</button><button type="button" id="stopLive">■ Stop camera</button></div>
+<p class="live-help" id="liveHelp">In Look &amp; Listen, detected objects get live bounding boxes and audio updates. Campus Checkpoints can scan demo QR markers in real time. Text OCR uses Capture &amp; analyze frame.</p>
+<div class="or-text">OR UPLOAD A PHOTO</div>
+<label class="upload" for="photo"><div style="font-size:30px;color:var(--aqua)">↑</div><b>Take a photo or choose an image</b><span>Tap here to use the camera or gallery</span><input type="file" id="photo" accept="image/jpeg,image/png,image/webp" capture="environment"></label>
+<img id="preview" alt="Selected photo preview">
+<div class="controls" id="readOptions" hidden><label for="ocrLang">Printed language</label><select id="ocrLang"><option value="eng">English</option><option value="urd">Urdu (اردو)</option></select></div>
+<div class="controls" id="guideOptions" hidden><label for="destination">Demo destination</label><select id="destination"><option value="library">Library</option><option value="helpdesk">Help Desk</option><option value="lab">Computer Lab</option><option value="gate">Welcome Point</option><option value="lobby">Reception</option></select><p class="small">These are fictional example checkpoints, not a mapped MUST building.</p></div>
+<button class="action" id="analyze" disabled>Analyze image →</button>
+<p class="small">🔒 Images are processed in your device's browser. The site does not upload your photos to NazarSaathi's server; AI model and library files are downloaded from third-party CDNs. Camera use requires HTTPS and permission; no recording is stored by this app.</p>
+</section>
+<aside class="panel"><div class="step">02 · RESULTS & AUDIO</div><h2>What NazarSaathi says</h2><div class="result"><div class="resulttop"><span class="sound">♫</span><div><strong>Spoken feedback</strong><small id="resultState" role="status">Waiting for an image</small></div></div>
+<div class="urdu" id="urdu" lang="ur" dir="rtl" aria-live="polite">اپنی تصویر منتخب کریں۔</div><div class="english" id="english" aria-live="polite">Start the camera for live detection, or choose a photo.</div><div class="details" id="details" hidden></div>
+<div class="subbuttons"><button id="speak" disabled type="button">▶ Speak again</button><button id="stop" type="button">Stop voice</button></div><p class="small" id="voiceNote">Use the language switch above. English uses your browser's voice; Urdu uses Urdu TTS or the online narration service.</p></div>
+<div class="markers"><h3>Try campus demo markers</h3><p class="small">Select Campus Checkpoints and scan one of these fictional QR codes with another device or print it. The generated checkpoint is for demonstration only.</p>
+<div class="markerbtns"><button data-marker="gate">Welcome Point</button><button data-marker="lobby">Reception</button><button data-marker="library">Library</button><button data-marker="helpdesk">Help Desk</button><button data-marker="lab">Computer Lab</button></div><div id="qrout"></div></div></aside></div></main>
+<footer class="footer">NazarSaathi · 2026 Research MVP · Not intended for unsupervised navigation</footer></div>
+<script src="/app.js" defer></script>
+</body></html>
