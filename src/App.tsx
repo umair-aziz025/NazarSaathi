@@ -8,6 +8,7 @@ import {
   Square, Volume2, Waves, Wifi, Zap, Sun, Moon, Leaf, Contrast
 } from 'lucide-react';
 import { initializeEngine } from './engine';
+import AnimatedHeadline from './components/AnimatedHeadline';
 import './App.css';
 import './themes.css';
 
@@ -82,7 +83,7 @@ export default function App() {
         <section className="hero container">
           <motion.div initial="hidden" animate="show" variants={appear} transition={{duration: .65}} className="hero-copy">
             <div className="eyebrow"><span className="eyebrow-rule"/><Sparkles size={14}/> AI-POWERED ACCESSIBILITY <span className="eyebrow-dot">✳</span> MADE FOR EVERYONE</div>
-            <h1>See beyond sight.<br/><span className="title-light">Hear the</span> <span className="title-accent">world.</span></h1>
+            <AnimatedHeadline/>
             <p>Your everyday surroundings, translated into words. Real-time visual understanding, natural voice interaction, and familiar languages—right from your browser.</p>
             <div className="hero-chips"><span><Waves size={15}/> Live vision</span><span><AudioLines size={15}/> Voice-first</span><span><Globe2 size={15}/> اردو + English</span></div>
           </motion.div>

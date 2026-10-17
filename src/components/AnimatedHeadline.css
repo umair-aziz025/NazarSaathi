@@ -1,0 +1,117 @@
+/* Staggered cinematic hero title, reusable with all NazarSaathi themes. */
+.animated-headline {
+  position: relative;
+  line-height: 1.16;
+  isolation: isolate;
+}
+.animated-headline .headline-line {
+  display: block;
+  max-width: 100%;
+}
+.animated-headline .headline-line-second {
+  position: relative;
+}
+.animated-headline .headline-segment {
+  display: inline;
+}
+.animated-headline .headline-word {
+  display: inline-block;
+  white-space: nowrap;
+}
+.animated-headline .headline-letter {
+  display: inline-block;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+.animated-headline .headline-space {
+  display: inline-block;
+  width: .26em;
+}
+.animated-headline .headline-line-second > .title-light {
+  margin-right: .26em;
+}
+.animated-headline .headline-glow {
+  position: relative;
+  white-space: nowrap;
+  --headline-a: #61d8c4;
+  --headline-b: #b4ffdf;
+  --headline-c: #65bcd8;
+  background: linear-gradient(
+    110deg,
+    var(--headline-a) 4%,
+    var(--headline-b) 36%,
+    var(--headline-c) 65%,
+    var(--headline-a) 94%
+  );
+  background-size: 250% 100%;
+  background-position: 100% 50%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 13px rgba(52, 207, 174, .18));
+  animation: headline-glint 7.5s ease-in-out 2.4s infinite;
+}
+.animated-headline .headline-glow .headline-letter {
+  color: inherit;
+}
+html[data-theme="daylight"] .headline-glow {
+  --headline-a: #00675f;
+  --headline-b: #168276;
+  --headline-c: #006c98;
+  filter: drop-shadow(0 2px 6px rgba(2, 108, 92, .1));
+}
+html[data-theme="sea-glass"] .headline-glow {
+  --headline-a: #075e4d;
+  --headline-b: #2d9177;
+  --headline-c: #176c88;
+  filter: drop-shadow(0 2px 6px rgba(19, 109, 83, .1));
+}
+html[data-theme="midnight"] .headline-glow {
+  --headline-a: #61d8c4;
+  --headline-b: #c5ffe4;
+  --headline-c: #86d6ee;
+}
+html[data-theme="contrast"] .headline-glow {
+  --headline-a: #fff2aa;
+  --headline-b: #ffffff;
+  --headline-c: #ffec81;
+  filter: none;
+}
+.animated-headline .headline-underline {
+  position: absolute;
+  width: clamp(76px, 30%, 168px);
+  height: 3px;
+  right: 1%;
+  bottom: -7px;
+  border-radius: 50px;
+  background: linear-gradient(90deg, transparent, var(--accent, #62e3cf), transparent);
+  transform-origin: left center;
+  transform: scaleX(0);
+  opacity: .72;
+  animation: headline-underline-reveal .92s cubic-bezier(.22,1,.36,1) 1.8s forwards;
+  pointer-events: none;
+}
+@keyframes headline-glint {
+  0%, 18%, 100% { background-position: 100% 50%; }
+  47%, 63% { background-position: 0% 50%; }
+}
+@keyframes headline-underline-reveal {
+  to { transform: scaleX(1); }
+}
+@media (max-width: 780px) {
+  .animated-headline { line-height: 1.19; }
+  .animated-headline .headline-underline { bottom: -4px; right: 4%; }
+}
+@media (max-width: 410px) {
+  .animated-headline .headline-letter { letter-spacing: -.01em; }
+  .animated-headline .headline-space { width: .24em; }
+  .animated-headline .headline-line-second > .title-light { margin-right: .2em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animated-headline .headline-glow { animation: none !important; }
+  .animated-headline .headline-underline {
+    animation: none !important;
+    transform: scaleX(1) !important;
+  }
+  .animated-headline .headline-letter { filter: none !important; }
+}
