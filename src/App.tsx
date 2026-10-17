@@ -1,14 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Accessibility, ArrowDownRight, ArrowLeftRight, ArrowRight, AudioLines,
   BookOpenText, Camera, Check, ChevronDown, CircleHelp, Compass, Ear, Eye,
   FileImage, Globe2, Headphones, HeartHandshake, Keyboard, Layers3, LockKeyhole,
   MapPinned, Mic2, PauseCircle, Play, Scan, ScanEye, ShieldCheck, Sparkles,
-  Square, Volume2, Waves, Wifi, Zap
+  Square, Volume2, Waves, Wifi, Zap, Sun, Moon, Leaf, Contrast
 } from 'lucide-react';
 import { initializeEngine } from './engine';
 import './App.css';
+import './themes.css';
 
 function Orb({ variant = 'a' }: { variant?: 'a'|'b' }) {
   return <div className={'orb orb-'+variant} aria-hidden="true" />;
@@ -21,10 +22,34 @@ function Brand() {
   </div>;
 }
 
+
+type ThemeName = 'daylight' | 'sea-glass' | 'midnight' | 'contrast';
+const themeOptions = [
+  { id: 'daylight', label: 'Daylight', Icon: Sun },
+  { id: 'sea-glass', label: 'Sea Glass', Icon: Leaf },
+  { id: 'midnight', label: 'Midnight', Icon: Moon },
+  { id: 'contrast', label: 'Contrast', Icon: Contrast },
+] as const;
+function getInitialTheme(): ThemeName {
+  if (typeof window === 'undefined') return 'daylight';
+  try {
+    const t = window.localStorage.getItem('nazarsaathi-theme');
+    return themeOptions.some(v => v.id === t) ? t as ThemeName : 'daylight';
+  } catch { return 'daylight'; }
+}
+
 const appear = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0 } };
 
 export default function App() {
+  const [theme, setTheme] = useState<ThemeName>(getInitialTheme);
   useEffect(() => { initializeEngine(); }, []);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme === 'midnight' || theme === 'contrast' ? 'dark' : 'light';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',
+      theme === 'midnight' ? '#07131e' : theme === 'contrast' ? '#020b13' : theme === 'sea-glass' ? '#edf6f2' : '#f7fafc');
+    try { window.localStorage.setItem('nazarsaathi-theme', theme); } catch { /* private mode */ }
+  }, [theme]);
 
   return (
     <div className="site-shell">
@@ -34,6 +59,19 @@ export default function App() {
         <div className="container header-inner">
           <Brand/>
           <div className="header-right">
+            <div className="appearance-control" aria-label="Theme settings">
+              <span className="appearance-label">APPEARANCE</span>
+              <div className="theme-options" role="group" aria-label="Color theme">
+                {themeOptions.map(({ id, label, Icon }) => (
+                  <button key={id} className="theme-choice" type="button"
+                    aria-label={`Use ${label} theme`} aria-pressed={theme === id}
+                    title={label} onClick={() => setTheme(id)}>
+                    <Icon size={16} strokeWidth={2} aria-hidden="true" />
+                    <span className="theme-choice-label">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <span className="header-label"><span className="signal" /> SYSTEM ONLINE</span>
             <a className="repo-link" href="https://github.com/umair-aziz025/NazarSaathi" target="_blank" rel="noopener noreferrer">View source <ArrowRight size={16}/></a>
           </div>
