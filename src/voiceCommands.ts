@@ -51,8 +51,8 @@ export function parseVoiceControl(raw: string): VoiceControlIntent | null {
   if (any(t, ['stop camera','turn off camera','camera off','close camera','کیمرہ بند','camera band'])) return {action:'camera',value:'stop'};
   if (any(t, ['start camera','open camera','turn on camera','camera on','enable camera','کیمرہ کھولو','کیمرہ چالو','کیمرہ شروع','camera kholo'])) return {action:'camera',value:'start'};
 
-  if (any(t, ['automatic narration off','disable automatic speech','auto narration off','stop auto narration','turn off auto speech','آٹو آواز بند','خودکار آواز بند','بیان بند'])) return {action:'speech',value:'off'};
-  if (any(t, ['automatic narration on','enable automatic speech','auto narration on','turn on auto speech','speak automatically','آٹو آواز چالو','خودکار آواز چالو','بیان شروع'])) return {action:'speech',value:'on'};
+  if (any(t, ['automatic narration off','disable automatic speech','auto narration off','stop auto narration','turn off auto speech','pause descriptions','pause narration','stop describing continuously','stop describing','stop live narration','narration off','خاموشی سے دیکھو','مسلسل بولنا بند','بتانا بند کرو','آٹو آواز بند','خودکار آواز بند','بیان بند'])) return {action:'speech',value:'off'};
+  if (any(t, ['automatic narration on','enable automatic speech','auto narration on','turn on auto speech','speak automatically','describe continuously','continuous descriptions on','keep telling me what you see','keep describing','keep talking about what you see','narrate what you see','tell me what you see continuously','narration on','لائیو منظر بتاتے رہو','مسلسل بتاؤ','مسلسل بولتے رہو','جو نظر آئے بتاتے رہو','دیکھ کر بتاتے رہو','آٹو آواز چالو','خودکار آواز چالو','بیان شروع','بتاتے رہو'])) return {action:'speech',value:'on'};
 
   if (any(t, ['detailed model','accurate model','better model','high accuracy model','detailed detection','بہتر ماڈل','تفصیلی ماڈل','درست ماڈل'])) return {action:'model',value:'detailed'};
   if (any(t, ['fast model','light model','lightweight model','speed mode','تیز ماڈل','ہلکا ماڈل'])) return {action:'model',value:'fast'};

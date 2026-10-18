@@ -47,3 +47,43 @@
 @media(max-width:780px){.camera-stage{aspect-ratio:3/4;max-height:73dvh;min-height:0}}
 @media(max-width:480px){.camera-stage{aspect-ratio:4/5;max-height:67dvh}.camera-layout-option{align-items:flex-start;flex-direction:column}.camera-layout-option select{width:100%}}
 @media(orientation:landscape) and (max-height:540px){.camera-stage{aspect-ratio:16/9;max-height:85dvh}}
+
+/* Persistent, high-contrast announcement state for nonvisual camera use. */
+.narration-status{
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  font-size:12px;
+  font-weight:650;
+  line-height:1.7;
+  padding:12px 14px;
+  margin:2px 0 15px;
+  color:var(--accent,#87ebd2);
+  background:var(--accent-bg,#113d38);
+  border:1px solid var(--accent-border,#35645b);
+  border-radius:10px;
+}
+.narration-status:before{
+  content:"";
+  display:block;
+  flex:0 0 8px;
+  height:8px;
+  border-radius:50%;
+  margin-top:6px;
+  background:#39bc91;
+  box-shadow:0 0 0 3px #3bd8a325;
+}
+.narration-status[data-active="false"]{
+  color:var(--secondary,#bed1dc);
+  background:var(--inner,#0b2632);
+  border-color:var(--border,#315160);
+}
+.narration-status[data-active="false"]:before{
+  background:#8c9da5;
+  box-shadow:none;
+}
+@media(max-width:600px){
+ .live-options{justify-content:flex-start;align-items:center;gap:10px 18px}
+ .live-options .checkbox-label{min-height:46px}
+ .narration-status{font-size:13px;line-height:1.6}
+}

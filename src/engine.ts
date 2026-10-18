@@ -5,6 +5,7 @@
 */
 // @ts-nocheck
 import { parseVoiceControl } from './voiceCommands';
+import { shouldNarrateScene } from './narrationPolicy';
 
 export function initializeEngine(): void {
 'use strict';
@@ -18,7 +19,16 @@ let modelType='lite_mobilenet_v2',modelPromise=null,classificationModel=null,cla
 const labels={person:'شخص',chair:'کرسی','dining table':'میز',bottle:'بوتل',cup:'کپ',book:'کتاب','cell phone':'موبائل فون',laptop:'لیپ ٹاپ',backpack:'بیگ',keyboard:'کی بورڈ',mouse:'ماؤس',car:'گاڑی',bus:'بس',dog:'کتا',cat:'بلی','potted plant':'گملے کا پودا',bench:'بینچ',handbag:'ہینڈ بیگ',bicycle:'سائیکل',clock:'گھڑی',tv:'ٹی وی',umbrella:'چھتری',apple:'سیب'};
 const posUr={left:'بائیں جانب',center:'درمیان',right:'دائیں جانب'};
 function status(t){$('resultState').textContent=t}
-function show(ur,en,extra){response={ur:ur,en:en};$('urdu').textContent=ur;$('english').textContent=en;$('details').textContent=extra||'';$('details').hidden=!extra;$('speak').disabled=false;status('Analysis complete');say();}
+function show(ur,en,extra){
+ response={ur,en};
+ $('urdu').textContent=ur;$('english').textContent=en;
+ $('details').textContent=extra||'';$('details').hidden=!extra;
+ $('speak').disabled=false;
+ status('Analysis complete');
+ // Direct answers take priority over live narration. Do not immediately talk over them.
+ if(cameraStream && mode==='look'){liveLastSaid=Date.now();livePreviousSignature=liveCandidate;}
+ say();
+}
 let voiceAudio=null,voiceAudioUrl=null,voiceSeq=0;
 function resumeMic(delay=700){
  clearTimeout(asrRetry);
@@ -26,6 +36,16 @@ function resumeMic(delay=700){
  asrRetry=setTimeout(()=>{if(micEnabled&&!speakingNow&&!micOn)startListening()},delay);
 }
 function muteMicForSpeech(){if(micOn&&asr){try{asr.abort()}catch(e){}}}
+function updateNarrationStatus(){
+ const live=$('speechLive');
+ const line=$('narrationStatus');
+ if(!live||!line)return;
+ const on=live.checked;
+ line.textContent=on
+  ? 'Continuous descriptions ON — NazarSaathi announces stable new objects and occasional recaps, not every video frame.'
+  : 'Continuous descriptions PAUSED — say "describe continuously" or "مسلسل بتاؤ" to resume.';
+ line.dataset.active=on?'true':'false';
+}
 function endSpeech(seq){if(seq!==voiceSeq)return;speakingNow=false;resumeMic(650);}
 function stopSpeech(resume=true){
  voiceSeq++;window.speechSynthesis?.cancel();
@@ -85,8 +105,17 @@ function publishLive(ur,en,details,signature){
  $('details').hidden=!details;
  $('speak').disabled=false;
  const now=Date.now();
- if($('speechLive').checked && !speakingNow && (signature!==livePreviousSignature || now-liveLastSaid>=25000) && now-liveLastSaid>=(micEnabled?20000:8500)){
-   say();liveLastSaid=now;livePreviousSignature=signature;
+ if(shouldNarrateScene({
+    enabled:$('speechLive').checked, speaking:speakingNow, hasCamera:!!cameraStream,
+    visible:!document.hidden && mode==='look',
+    hasStableScene:liveCandidateCount>=(signature==='none'?14:3),
+    now, lastSpokenAt:liveLastSaid,
+    sceneSignature:signature,lastSpokenSignature:livePreviousSignature,
+    isRecognizedScene:signature!=='none'
+ })){
+    // Reserve the narration slot immediately to avoid double announcements while fetching Urdu TTS.
+    liveLastSaid=now;livePreviousSignature=signature;
+    say();
  }
 }
 function drawDetections(detections, sourceWidth, sourceHeight){
@@ -165,7 +194,10 @@ async function startLive(){
   if(run!==liveRun)return;
   $('liveBox').hidden=false;$('liveButtons').hidden=false;$('startLive').hidden=true;
   $('cameraLabel').textContent=mode==='read'?'● LIVE · Capture text':mode==='guide'?'● LIVE · QR scanning':'● LIVE · Object detection';
-  $('liveCount').textContent='Camera active';status('Camera is live');livePreviousSignature='';liveCandidate='';liveCandidateCount=0;liveLastSaid=0;liveFrameNumber=0;
+  $('liveCount').textContent='Camera active';status('Camera is live');
+ livePreviousSignature='';liveCandidate='';liveCandidateCount=0;liveLastSaid=0;liveClock='';liveFrameNumber=0;
+ // Automatic narration defaults to on, but never override an explicit pause.
+ updateNarrationStatus();
   const tracks=cameraStream.getVideoTracks();if(tracks[0])tracks[0].onended=()=>{if(cameraStream){stopLive();status('Camera was disconnected')}};
   if(mode==='look'){
    if(!window.cocoSsd||!window.tf)throw Error('Vision model libraries did not load. Connect to the internet and refresh the page.');
@@ -194,15 +226,28 @@ async function processLive(run){
    const brief=detections.slice(0,3).map(d=>{let center=(d.bbox[0]+d.bbox[2]/2)/w;return {name:d.class,position:center<.33?'left':center>.67?'right':'center',score:d.score}});
    let sig=brief.map(d=>d.name+':'+d.position).sort().join('|')||'none';
    if(sig===liveCandidate)liveCandidateCount++;else{liveCandidate=sig;liveCandidateCount=1;}
-   if(liveCandidateCount>=2&&sig!==liveClock){
-     liveClock=sig;
-     if(brief.length){
-       const en='I can see '+brief.map(d=>d.name+' on the '+d.position).join(', ')+'.';
-       const ur='مجھے نظر آ رہا ہے: '+brief.map(d=>posUr[d.position]+' '+(labels[d.name]||d.name)).join('، ')+'۔';
-       const extra=brief.map(d=>d.name+' · '+d.position+' · '+Math.round(d.score*100)+'% model score').join('\n');
-       publishLive(ur,en,extra,sig);
-     }else{
-       response=null;$('speak').disabled=true;$('urdu').textContent='اس وقت کوئی چیز شناخت نہیں ہوئی۔';$('english').textContent='No recognized objects in this frame.';$('details').hidden=true;
+   // Wait for a stable view so a single noisy frame does not trigger an announcement.
+   // Keep revisiting unchanged scenes so narration really continues while the camera is open.
+   if(liveCandidateCount>=(brief.length?3:14)){
+     const now=Date.now();
+     const canSpeak=shouldNarrateScene({
+       enabled:$('speechLive').checked,speaking:speakingNow,hasCamera:!!cameraStream,
+       visible:!document.hidden && mode==='look',hasStableScene:true,now,
+       lastSpokenAt:liveLastSaid,sceneSignature:sig,
+       lastSpokenSignature:livePreviousSignature,isRecognizedScene:brief.length>0
+     });
+     if((sig!==liveClock&&!speakingNow)||canSpeak){
+       liveClock=sig;
+       if(brief.length){
+         const en='I can see '+brief.map(d=>d.name+' on the '+d.position).join(', ')+'.';
+         const ur='مجھے نظر آ رہا ہے: '+brief.map(d=>posUr[d.position]+' '+(labels[d.name]||d.name)).join('، ')+'۔';
+         const extra=brief.map(d=>d.name+' · '+d.position+' · '+Math.round(d.score*100)+'% model score').join('\n');
+         publishLive(ur,en,extra,sig);
+       }else{
+         // No confident detection does NOT mean an empty or safe path.
+         publishLive('اس وقت میں کسی چیز کو یقین سے نہیں پہچان سکا۔ اس کا یہ مطلب نہیں کہ راستہ محفوظ ہے۔',
+           'I cannot confidently recognize an object right now. This does not mean the area is clear or safe.','',sig);
+       }
      }
    }
    const now=Date.now();if(now-liveLastStatus>=2000){status('LIVE · Camera detecting objects');liveLastStatus=now;}
@@ -289,7 +334,9 @@ function toggleAssistant(){
  if(micEnabled){stopListening();return}
  if(!window.SpeechRecognition&&!window.webkitSpeechRecognition){micStatus('Your browser cannot recognize voice commands. Please try Chrome on Android or use the typed command box.');return}
  micBlocked=false;micEnabled=true;setMicButton();
- $('speechLive').checked=false;
+ // Voice command listening and continuous descriptions coexist. Narration briefly pauses
+ // recognition to avoid the assistant treating its own speech as a user command.
+ updateNarrationStatus();
  if(!cameraStream)startLive().catch(()=>{});
  startListening();
 }
@@ -301,12 +348,17 @@ function stopListening(){
 function respond(ur,en,more=''){show(ur,en,more)}
 function recent(){return cameraStream&&mode==='look'&&Date.now()-objectsAt<6000?recentObjects:null}
 function describe(){
+ // "What is in front of me?" also switches on continuing commentary.
+ $('speechLive').checked=true;updateNarrationStatus();
  const objs=recent();
- if(!objs){respond('آپ کا لائیو کیمرہ شروع نہیں ہے یا ابھی تصویر نہیں ملی۔','Please start the live camera and wait for object recognition.');return}
- if(!objs.length){respond('کوئی چیز واضح طور پر شناخت نہیں ہوئی۔ اس کا یہ مطلب نہیں کہ راستہ خالی ہے۔','No object confidently recognized. This does not mean the area is clear.');return}
+ if(!objs){respond('براہ کرم لائیو کیمرہ شروع کریں۔ پھر میں سامنے کی چیزیں بتاتا رہوں گا۔',
+  'Please start the live camera. I will keep describing recognized objects as the view changes.');return;}
+ if(!objs.length){respond('ابھی کوئی چیز واضح نہیں پہچانی۔ میں کیمرہ دیکھتا رہوں گا، لیکن اس کا مطلب نہیں کہ راستہ محفوظ ہے۔',
+  'No object confidently recognized yet. I will keep checking the view, but this does not mean the area is safe.');return;}
  const arr=objs.slice(0,4);
- respond('سامنے نظر آ رہا ہے: '+arr.map(d=>posUr[d.side]+' '+(labels[d.class]||d.class)).join('، ')+'۔',
- 'I can see '+arr.map(d=>d.class+' on the '+d.side).join(', ')+'.','Positions are relative to the camera. Not a safe route.');
+ respond('سامنے نظر آ رہا ہے: '+arr.map(d=>posUr[d.side]+' '+(labels[d.class]||d.class)).join('، ')+'۔ منظر بدلنے پر میں بتاتا رہوں گا۔',
+ 'I can see '+arr.map(d=>d.class+' on the '+d.side).join(', ')+'. I will continue describing meaningful changes.',
+ 'Positions are relative to the camera, not directions for safe walking.');
 }
 const synonyms={bottle:['bottle'],'بوتل':['bottle'],phone:['cell phone'],mobile:['cell phone'],'موبائل':['cell phone'],'فون':['cell phone'],book:['book'],'کتاب':['book'],chair:['chair'],'کرسی':['chair'],table:['dining table'],'میز':['dining table'],cup:['cup'],'کپ':['cup'],laptop:['laptop'],'لیپ ٹاپ':['laptop'],person:['person'],'آدمی':['person'],dog:['dog'],'کتا':['dog'],cat:['cat'],'بلی':['cat'],bag:['backpack','handbag'],'بیگ':['backpack','handbag'],car:['car'],'گاڑی':['car'],keyboard:['keyboard'],door:[],stairs:[],'دروازہ':[],'سیڑھی':[]};
 function findItem(key,cats){
@@ -438,9 +490,10 @@ function performVoiceControl(intent){
       value==='look'?'Object recognition mode selected.':value==='read'?'Text reading mode selected.':'Demo checkpoint mode selected.');return;
   case 'speech':
     if(value==='repeat'){say();return;}
-    if(value==='stop'){stopSpeech();$('speechLive').checked=false;micStatus('Narration stopped; microphone controls remain enabled.');return;}
+    if(value==='stop'){stopSpeech();$('speechLive').checked=false;updateNarrationStatus();micStatus('Narration stopped; microphone controls remain enabled.');return;}
     voiceSet('speechLive',value==='on');
-    voiceAcknowledge(value==='on'?'خودکار آواز شروع ہو گئی ہے۔':'خودکار آواز بند کر دی گئی ہے۔',value==='on'?'Automatic narration enabled.':'Automatic narration disabled.');return;
+    voiceAcknowledge(value==='on'?'لائیو منظر کی مسلسل وضاحت شروع ہو گئی ہے۔ کیمرہ حرکت دینے پر نئی چیزوں کے بارے میں بتاؤں گا۔':'لائیو منظر کی مسلسل آواز بند کر دی گئی ہے۔',
+      value==='on'?'Continuous live descriptions enabled. I will announce changes as the camera moves.':'Continuous live descriptions paused.');return;
   case 'model':
     voiceSet('visionModel',value==='fast'?'lite_mobilenet_v2':'mobilenet_v2');
     voiceAcknowledge(value==='fast'?'تیز ماڈل منتخب ہوا۔':'تفصیلی ماڈل منتخب ہوا۔ یہ سست ہو سکتا ہے۔',
@@ -542,7 +595,7 @@ window.addEventListener('nazarsaathi:hear-invitation',async()=>{
 window.addEventListener('nazarsaathi:guided-start',()=>{
  // This event is dispatched synchronously from the first consent tap.
  micBlocked=false;
- language='en';$('speechLanguage').value='en';$('speechLive').checked=false;
+ language='en';$('speechLanguage').value='en';$('speechLive').checked=true;updateNarrationStatus();
  const hasASR=!!(window.SpeechRecognition||window.webkitSpeechRecognition);
  if(hasASR){micEnabled=true;setMicButton();startListening();}
  else micStatus('This browser does not support speech recognition. Camera and typed commands are still available.');
@@ -553,6 +606,13 @@ window.addEventListener('nazarsaathi:guided-start',()=>{
          'NazarSaathi is starting. Say available functions to hear all voice commands. Say speak Urdu to change language.');
 });
 
+$('speechLive').onchange=()=>{
+ updateNarrationStatus();
+ if($('speechLive').checked){
+   liveLastSaid=0;livePreviousSignature='';liveClock='';
+ }
+};
+updateNarrationStatus();
 $('assistantToggle').onclick=toggleAssistant;
 $('voiceForm').onsubmit=e=>{e.preventDefault();command($('commandInput').value)};
 window.addEventListener('pagehide',()=>stopListening());

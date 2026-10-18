@@ -191,8 +191,11 @@ export default function App() {
               <div className="camera-layout-option"><label htmlFor="cameraFillMode">Camera view</label><select id="cameraFillMode" defaultValue="cover"><option value="cover">Fill frame · full width</option><option value="contain">Show entire image</option></select></div>
               <div className="live-options">
                 <label htmlFor="cameraSide" className="field-label"><ArrowLeftRight size={16}/> Camera <span className="select-box"><select id="cameraSide" defaultValue="environment"><option value="environment">Back camera</option><option value="user">Front camera</option></select><ChevronDown size={13}/></span></label>
-                <label htmlFor="speechLive" className="checkbox-label"><input id="speechLive" type="checkbox" defaultChecked/><span className="faux-check"><Check size={12}/></span><Volume2 size={15}/> Auto narrate</label>
+                <label htmlFor="speechLive" className="checkbox-label"><input id="speechLive" type="checkbox" defaultChecked/><span className="faux-check"><Check size={12}/></span><Volume2 size={15}/> Describe continuously</label>
               </div>
+              <p id="narrationStatus" className="narration-status" role="status">
+                Continuous descriptions ON — NazarSaathi announces stable new objects and occasional recaps, not every video frame.
+              </p>
 
               <div className="live-help" id="liveHelp"><ShieldCheck size={17}/><span>Visual analysis runs in your browser. AI models may require an internet connection.</span></div>
               <div className="section-divider"><span>OR USE A PHOTO</span></div>
@@ -206,7 +209,7 @@ export default function App() {
             <div className="right-column">
               <section className="assistantPanel assistant-console" aria-label="NazarSaathi voice assistant">
                 <div className="panel-topline"><div className="panel-name"><span className="panel-icon assistant-icon"><Mic2 size={20}/></span><div><span className="panel-overline">CONVERSATIONAL AI</span><h3>Voice companion</h3></div></div><span className="assistant-star"><Sparkles size={18}/></span></div>
-                <p className="assistant-intro">Talk naturally. Ask what's around you, find an object, or read something out loud.</p>
+                <p className="assistant-intro">Live descriptions are on by default. Ask questions or say “Pause descriptions” whenever you want quiet.</p>
                 <div className="langRow"><label htmlFor="speechLanguage"><Globe2 size={17}/> Speaking language</label><div className="lang-select"><select id="speechLanguage" defaultValue="ur"><option value="ur">اردو · Urdu</option><option value="en">English</option></select><ChevronDown size={15}/></div></div>
                 <button id="assistantToggle" type="button" className="assistbtn" aria-pressed="false"><Mic2 size={19}/> Start Hands-Free Assistant</button>
                 <div id="micStatus" className="micstate" role="status" aria-live="polite"><span className="muted-dot"/> Microphone off. Tap once to start listening.</div>
@@ -221,7 +224,7 @@ export default function App() {
                         <p>“Show entire image” · “Fill camera frame” · “Front camera” · “Back camera”</p>
                         <p>“Object detection mode” · “Reading mode” · “Checkpoint mode”</p>
                         <p>“Fast model” · “Detailed model” · “More detections” · “Balanced sensitivity”</p>
-                        <p>“Auto narration on” · “Auto narration off” · “Speak Urdu” · “Speak English”</p>
+                        <p>“Describe continuously” · “Pause descriptions” · “Speak Urdu” · “Speak English”</p>
                         <p>“White theme” · “Dark theme” · “Read this” · “Read the results” · “Help”</p>
                       </div>
                       <div lang="ur" dir="rtl">
@@ -229,7 +232,7 @@ export default function App() {
                         <p>”پوری تصویر دکھاؤ“ · ”کیمرہ فل کرو“ · ”فرنٹ کیمرہ“ · ”بیک کیمرہ“</p>
                         <p>”پڑھنے کا موڈ“ · ”شناخت والا موڈ“ · ”چیک پوائنٹ موڈ“</p>
                         <p>”تیز ماڈل“ · ”بہتر ماڈل“ · ”زیادہ چیزیں“</p>
-                        <p>”خودکار آواز چالو“ · ”خودکار آواز بند“ · ”انگریزی بولو“</p>
+                        <p>”مسلسل بتاؤ“ · ”بتانا بند کرو“ · ”انگریزی بولو“</p>
                         <p>”سفید تھیم“ · ”پچھلی سیٹنگ“ · ”سامنے کیا ہے؟“</p>
                       </div>
                     </div>
