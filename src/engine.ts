@@ -17,8 +17,75 @@ const names={gate:['Welcome Point','استقبالیہ گیٹ'],lobby:['Receptio
 const paths={gate:['lobby'],lobby:['gate','library','helpdesk','lab'],library:['lobby'],helpdesk:['lobby'],lab:['lobby']};
 let modelType='lite_mobilenet_v2',modelPromise=null,classificationModel=null,classificationBusy=false;
 const isMobileDevice=()=>/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-let lastFocusPass=0,zeroDetectionSince=0;
-function mobileVisionStatus(text){const el=$('visionDiagnostic');if(el)el.textContent=text;}
+let lastFocusPass=0,zeroDetectionSince=0,backendRecoveryAttempted=false,previewCanvas=null;
+let micRestartFailures=0,micErrors=0,micLastActivity=0,speechWatchdog=null;
+function mobileVisionStatus(text){const el=$('visionDiagnostic');if(el&&el.textContent!==text)el.textContent=text;}
+function browserDiagnosis(){
+ const ua=navigator.userAgent||'';
+ const inApp=/FBAN|FBAV|Instagram|WhatsApp|; wv\)|Line\/|Snapchat/i.test(ua);
+ const engine=window.SpeechRecognition||window.webkitSpeechRecognition;
+ let browser=inApp?'In-app browser':/CriOS|Chrome|Chromium/i.test(ua)?'Chrome':/Safari/i.test(ua)?'Safari':'Other browser';
+ return {browser,inApp,engine:!!engine,secure:window.isSecureContext,camera:!!navigator.mediaDevices?.getUserMedia,
+  tf:!!window.tf,model:!!window.cocoSsd,backend:window.tf?.getBackend?.()||'not initialized'};
+}
+function updateMobileCapabilities(){
+ const d=browserDiagnosis(),el=$('deviceStatus');
+ if(!el)return;
+ el.textContent='Browser: '+d.browser+' · Camera API: '+(d.camera?'yes':'unavailable')+
+  ' · Voice recognition: '+(d.engine?'available':'not supported')+' · AI library: '+(d.tf&&d.model?'loaded':'missing')+
+  ' · AI backend: '+d.backend+'.'+(d.inApp?' In-app browsers may block microphone and model downloads; open the link directly in Chrome or Safari.':'');
+ if(!d.engine&&$('micStatus'))micStatus('Voice recognition API unavailable here. Open in Chrome on Android or Safari on iOS. Typed commands still work.');
+}
+async function loadAlternateScript(src){
+ return new Promise((resolve,reject)=>{
+  const script=document.createElement('script');
+  const timer=setTimeout(()=>{script.remove();reject(Error('Alternative AI library timeout'));},11000);
+  script.onload=()=>{clearTimeout(timer);resolve();};
+  script.onerror=()=>{clearTimeout(timer);reject(Error('Alternative AI library blocked'));};
+  script.src=src;script.defer=true;document.head.appendChild(script);
+ });
+}
+async function ensureVisionLibraries(){
+ // Some mobile networks fail loading jsDelivr even when Railway itself loads correctly.
+ if(!window.tf){
+  mobileVisionStatus('Primary TensorFlow.js CDN unavailable. Trying another source…');
+  await loadAlternateScript('https://unpkg.com/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
+ }
+ if(!window.cocoSsd){
+  mobileVisionStatus('Primary COCO-SSD CDN unavailable. Trying another source…');
+  await loadAlternateScript('https://unpkg.com/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js');
+ }
+ if(!window.tf||!window.cocoSsd)throw Error('AI libraries are blocked. Use Chrome/Safari and check connectivity.');
+ await window.tf.ready();
+ updateMobileCapabilities();
+}
+async function mobileDetectorInference(video){
+ const w=video.videoWidth,h=video.videoHeight;
+ // Avoid decoding full 1080p/4K video directly into WebGL tensors on a memory-limited phone.
+ const maxEdge=isMobileDevice()?640:960;
+ if(!previewCanvas)previewCanvas=document.createElement('canvas');
+ const scale=Math.min(1,maxEdge/Math.max(w,h));
+ const outW=Math.max(1,Math.round(w*scale)),outH=Math.max(1,Math.round(h*scale));
+ if(previewCanvas.width!==outW)previewCanvas.width=outW;
+ if(previewCanvas.height!==outH)previewCanvas.height=outH;
+ previewCanvas.getContext('2d',{alpha:false}).drawImage(video,0,0,previewCanvas.width,previewCanvas.height);
+ const results=await detector.detect(previewCanvas);
+ if(scale===1)return results;
+ return results.map(d=>({...d,bbox:d.bbox.map((v,i)=>v/scale)}));
+}
+async function recoverMobileBackend(err){
+ if(backendRecoveryAttempted||!window.tf)return false;
+ backendRecoveryAttempted=true;
+ mobileVisionStatus('AI GPU error detected. Switching to slower CPU recognition: '+String(err?.message||err).slice(0,120));
+ status('Mobile AI fallback: CPU');
+ try{
+  if(!await window.tf.setBackend('cpu'))return false;
+  await window.tf.ready();detector=null;detectorPromise=null;
+  detector=await window.cocoSsd.load({base:'lite_mobilenet_v2'});modelType='lite_mobilenet_v2';
+  $('visionModel').value=modelType;
+  updateMobileCapabilities();return true;
+ }catch(e){mobileVisionStatus('AI recovery failed: '+String(e?.message||e));return false;}
+}
 async function detectCenterCrop(video,detector,threshold){
  const vw=video.videoWidth,vh=video.videoHeight;if(!vw||!vh)return [];
  const cw=Math.round(vw*.63),ch=Math.round(vh*.63),left=Math.round((vw-cw)/2),top=Math.round((vh-ch)/2);
@@ -69,16 +136,28 @@ function updateNarrationStatus(){
   : 'Continuous descriptions PAUSED — say "describe continuously" or "مسلسل بتاؤ" to resume.';
  line.dataset.active=on?'true':'false';
 }
-function endSpeech(seq){if(seq!==voiceSeq)return;speakingNow=false;resumeMic(650);}
+function endSpeech(seq){
+ if(seq!==voiceSeq)return;
+ if(speechWatchdog){clearTimeout(speechWatchdog);speechWatchdog=null;}
+ speakingNow=false;resumeMic(650);
+}
+function armSpeechWatchdog(seq){
+ if(speechWatchdog)clearTimeout(speechWatchdog);
+ speechWatchdog=setTimeout(()=>{
+  if(seq!==voiceSeq||!speakingNow)return;
+  // Some mobile browsers omit synthesis onend, leaving recognition disabled forever.
+  window.speechSynthesis?.cancel();endSpeech(seq);
+ },19000);
+}
 function stopSpeech(resume=true){
- voiceSeq++;window.speechSynthesis?.cancel();
+ voiceSeq++;if(speechWatchdog){clearTimeout(speechWatchdog);speechWatchdog=null;}window.speechSynthesis?.cancel();
  if(voiceAudio){voiceAudio.pause();voiceAudio.src='';voiceAudio=null}
  if(voiceAudioUrl){URL.revokeObjectURL(voiceAudioUrl);voiceAudioUrl=null}
  speakingNow=false;if(resume)resumeMic(600);
 }
 async function say(){
  if(!response)return;
- stopSpeech(false);const seq=voiceSeq;speakingNow=true;muteMicForSpeech();
+ stopSpeech(false);const seq=voiceSeq;speakingNow=true;muteMicForSpeech();armSpeechWatchdog(seq);
  if(language==='en'){
   const t=new SpeechSynthesisUtterance(response.en||'No result yet.');t.lang='en-US';t.rate=.89;
   const voice=(window.speechSynthesis?.getVoices()||[]).find(v=>/^en[-_]/i.test(v.lang));if(voice)t.voice=voice;
@@ -177,7 +256,7 @@ function drawDetections(detections, sourceWidth, sourceHeight){
    const lx=Math.max(4,Math.min(stageW-labelWidth-4,visibleLeft));
    // Put the label *inside* the box near top so it cannot disappear under the LIVE badge.
    const ly=Math.max(4,Math.min(stageH-labelH-4,visibleTop+5));
-   ctx.fillStyle='#073c37e8';ctx.beginPath();ctx.roundRect(lx,ly,labelWidth,labelH,5);ctx.fill();
+   ctx.fillStyle='#073c37e8';ctx.beginPath();if(typeof ctx.roundRect==='function'){ctx.roundRect(lx,ly,labelWidth,labelH,5);ctx.fill();}else{ctx.fillRect(lx,ly,labelWidth,labelH);}
    ctx.fillStyle='#f3fffa';ctx.textBaseline='middle';ctx.fillText(text,lx+labelPad,ly+labelH/2);
  }
 }
@@ -204,11 +283,12 @@ function updateCameraMessage(err){
 async function startLive(){
  if(cameraStream)stopLive(true);
  const run=++liveRun;
- $('startLive').disabled=true;$('startLive').textContent='Starting camera...';status('Requesting camera permission…');mobileVisionStatus('Requesting camera permission…');
+ $('startLive').disabled=true;$('startLive').textContent='Starting camera...';status('Requesting camera permission…');mobileVisionStatus('Requesting camera permission…');updateMobileCapabilities();
  if(!navigator.mediaDevices?.getUserMedia){updateCameraMessage({name:'Unsupported',message:'This browser does not support getUserMedia. Open the HTTPS page in Chrome or Safari.'});$('startLive').disabled=false;$('startLive').textContent='◉ Start Live Camera';return;}
  try{
   const facing=$('cameraSide').value;
-  const constraints={audio:false,video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:15,max:24}}};
+  const lowMemory=isMobileDevice() && navigator.deviceMemory && navigator.deviceMemory<4;
+  const constraints={audio:false,video:{facingMode:{ideal:facing},width:{ideal:lowMemory?960:1280},height:{ideal:lowMemory?540:720},frameRate:{ideal:15,max:24}}};
   try{cameraStream=await navigator.mediaDevices.getUserMedia(constraints)}catch(error){
    if(error.name==='OverconstrainedError'||error.name==='NotReadableError')
     cameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:640},height:{ideal:480}},audio:false});
@@ -229,7 +309,7 @@ async function startLive(){
  updateNarrationStatus();
   const tracks=cameraStream.getVideoTracks();if(tracks[0])tracks[0].onended=()=>{if(cameraStream){stopLive();status('Camera was disconnected')}};
   if(mode==='look'){
-   if(!window.cocoSsd||!window.tf)throw Error('Vision model libraries did not load. Connect to the internet and refresh the page.');
+   await ensureVisionLibraries();
    if(!detector){
     status('Loading AI detector. Camera is already live…');
     mobileVisionStatus('Downloading '+(modelType==='mobilenet_v2'?'detailed':'fast')+' recognition model. First load may take time on a phone.');
@@ -238,19 +318,30 @@ async function startLive(){
      detectorPromise ||= cocoSsd.load({base:modelType}).catch(err=>{detectorPromise=null;throw err});
      detector=await detectorPromise;
     }catch(err){
-     if(modelType!=='lite_mobilenet_v2'){
+     if(isMobileDevice()&&await recoverMobileBackend(err)){
+      // Model was recovered on CPU.
+     }else if(modelType!=='lite_mobilenet_v2'){
       modelType='lite_mobilenet_v2';$('visionModel').value=modelType;detectorPromise=null;
       detector=await cocoSsd.load({base:modelType});
      }else throw err;
     }
    }
    if(run!==liveRun)return;
-   status('Live object detection active');
+   status('Live object detection active');updateMobileCapabilities();
+   mobileVisionStatus('Detector ready · backend '+(window.tf?.getBackend?.()||'unknown')+' · camera '+video.videoWidth+'×'+video.videoHeight+'.');
   }else if(mode==='guide'){status('Live QR scanning active');}
   else{status('Camera active. Tap Capture & analyze frame to read printed text.');}
   processLive(run);
  }catch(err){
-  if(run===liveRun){stopLive(true);updateCameraMessage(err);mobileVisionStatus('Camera or AI failed: '+(err?.message||String(err)));}
+  if(run===liveRun){
+   const issue=String(err?.message||err);
+   if(cameraStream&&$('liveVideo').readyState>=2){
+    // Camera permission succeeded: keep the live preview instead of hiding it on AI failure.
+    status('Camera working · AI unavailable');
+    mobileVisionStatus('Camera OK, but AI unavailable: '+issue+'. Try Retry AI, or open in Chrome / Safari.');
+    $('english').textContent='Camera is active but AI detection could not start: '+issue;
+   }else{stopLive(true);updateCameraMessage(err);mobileVisionStatus('Camera could not start: '+issue);}
+ }
  }
 }
 async function processLive(run){
@@ -260,7 +351,13 @@ async function processLive(run){
   const w=video.videoWidth,h=video.videoHeight;
   if(mode==='look'){
    const minScore=Number($('detectSensitivity')?.value||0.35);
-   let detections=(await detector.detect(video)).filter(d=>d.score>=minScore).sort((a,b)=>b.score-a.score).slice(0,10);
+   let rawDetections;
+   try{rawDetections=await mobileDetectorInference(video);}
+   catch(err){
+    if(isMobileDevice()&&await recoverMobileBackend(err))rawDetections=await mobileDetectorInference(video);
+    else throw err;
+   }
+   let detections=rawDetections.filter(d=>d.score>=minScore).sort((a,b)=>b.score-a.score).slice(0,10);
    if(run!==liveRun)return;
    if(!detections.length&&$('focusAssist')?.checked&&Date.now()-lastFocusPass>3500){
     lastFocusPass=Date.now();
@@ -317,7 +414,7 @@ async function processLive(run){
    $('liveCount').textContent='Live QR scanner';
   }else{$('liveCount').textContent='Live preview · Capture text';}
  }catch(err){
-  if(run===liveRun){status('Live detection error: '+(err?.message||String(err)));$('english').textContent='Detection failed: '+(err?.message||String(err));}
+  if(run===liveRun){status('Live detection error');const issue=String(err?.message||err);$('english').textContent='Detection failed: '+issue;mobileVisionStatus('AI inference failed: '+issue+'. Try Retry AI or switch to Chrome/Safari.');}
  }
  if(run===liveRun&&cameraStream)liveTimer=setTimeout(()=>processLive(run),mode==='read'?1200:mode==='guide'?550:300);
 }
@@ -369,31 +466,82 @@ function setMicButton(){
 function startListening(){
  if(!micEnabled||micOn||speakingNow||document.hidden)return;
  const SpeechEngine=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!SpeechEngine){micEnabled=false;setMicButton();micStatus('Speech recognition unsupported. Try Chrome on Android or use typed commands.');return}
+ if(!SpeechEngine){
+  micEnabled=false;setMicButton();
+  micStatus('Voice recognition unavailable in this browser. Open this URL in Chrome on Android or Safari on iPhone; do not use an in-app browser. Typed commands still work.');
+  updateMobileCapabilities();
+  return;
+ }
  if(!asr){
-  asr=new SpeechEngine();asr.continuous=true;asr.interimResults=false;asr.maxAlternatives=1;
-  asr.onstart=()=>{micOn=true;micStatus('🎤 Listening in '+(language==='ur'?'Urdu':'English')+'. Ask a question.')};
-  asr.onresult=(e)=>{
+  asr=new SpeechEngine();
+  // Repeating short recognition sessions is more compatible with mobile Safari and Android.
+  asr.continuous=!isMobileDevice();
+  asr.interimResults=false;
+  asr.maxAlternatives=1;
+  asr.onstart=()=>{
+   micOn=true;micRestartFailures=0;micErrors=0;micLastActivity=Date.now();
+   micStatus('🎤 Listening in '+(language==='ur'?'Urdu':'English')+' — say a command.');
+  };
+  asr.onresult=e=>{
    if(!micEnabled||speakingNow)return;
+   micLastActivity=Date.now();
+   let heard=false;
    for(let n=e.resultIndex;n<e.results.length;n++){
     if(!e.results[n].isFinal)continue;
     const phrase=(e.results[n][0]?.transcript||'').trim();
-    if(phrase){$('commandInput').value=phrase;command(phrase)}
+    if(phrase){
+      heard=true;$('commandInput').value=phrase;
+      const transcript=$('voiceTranscript');
+      if(transcript)transcript.textContent='Heard: '+phrase;
+      micStatus('Heard: '+phrase);
+      command(phrase);
+    }
    }
+   if(!heard)micStatus('Speech detected. Waiting for a complete command…');
   };
-  asr.onerror=(e)=>{
+  asr.onerror=e=>{
    micOn=false;
    if(!micEnabled)return;
-   if(['not-allowed','service-not-allowed','audio-capture'].includes(e.error)){
-    micEnabled=false;micBlocked=true;setMicButton();micStatus('Microphone unavailable or permission denied. Enable microphone permission or use typed commands.');
-   }else if(e.error==='network'){micEnabled=false;micBlocked=true;setMicButton();micStatus('Speech recognition network service unavailable. Try again or type your question.');}
-   else if(!['aborted','no-speech'].includes(e.error))micStatus('Voice recognition error: '+e.error);
+   const error=e.error||'unknown';
+   if(['not-allowed','service-not-allowed','audio-capture'].includes(error)){
+     micEnabled=false;micBlocked=true;setMicButton();
+     micStatus('Microphone access blocked ('+error+'). Check site permissions in your browser and tap Retry voice.');
+   }else if(error==='network'){
+     micEnabled=false;micBlocked=true;setMicButton();
+     micStatus('Browser speech service failed (network). Open the website directly in Chrome or Safari and try Retry voice. This device may not support this language or service.');
+   }else if(error==='language-not-supported'){
+     micEnabled=false;micBlocked=true;setMicButton();
+     micStatus('Recognition language is unavailable. Select English and tap Retry voice.');
+   }else if(error==='no-speech'){
+     micStatus('No speech heard. Still ready; if listening does not resume, tap Retry voice.');
+   }else if(error!=='aborted'){
+     micErrors++;micStatus('Speech engine error: '+error+'. Try Retry voice.');
+   }
+   updateMobileCapabilities();
   };
-  asr.onend=()=>{micOn=false;if(micEnabled&&!speakingNow)resumeMic(900)};
+  asr.onend=()=>{
+    micOn=false;
+    if(micEnabled&&!speakingNow&&!micBlocked){
+      micRestartFailures++;
+      if(micRestartFailures>10){
+        micEnabled=false;setMicButton();
+        micStatus('Recognition stopped repeatedly. Tap Retry voice to restart from a new user gesture.');
+      }else{
+        micStatus('Voice recognition paused; restarting…');
+        resumeMic(isMobileDevice()?1300:850);
+      }
+    }
+  };
  }
  asr.lang=language==='ur'?'ur-PK':'en-US';
- try{asr.start();micOn=true;micStatus('Requesting microphone permission…')}
- catch(e){micOn=false;micStatus('Microphone could not start: '+e.message);resumeMic(1200)}
+ try{
+  asr.start();micOn=true;
+  micStatus('Requesting microphone / speech recognition permission…');
+ }catch(e){
+  micOn=false;micRestartFailures++;
+  micStatus('Recognition could not start: '+(e?.message||String(e))+'. Tap Retry voice.');
+  if(!isMobileDevice()&&micRestartFailures<3)resumeMic(1600);
+ }
 }
 function toggleAssistant(){
  if(micEnabled){stopListening();return}
@@ -727,11 +875,35 @@ $('speechLive').onchange=()=>{
  }
 };
 updateNarrationStatus();
+$('retryVoice').onclick=()=>{
+ // This direct click provides the user gesture required by many mobile recognition engines.
+ micBlocked=false;micEnabled=true;micRestartFailures=0;micErrors=0;
+ clearTimeout(asrRetry);
+ if(asr){try{asr.abort()}catch(e){}}
+ asr=null;micOn=false;
+ stopSpeech(false);setMicButton();
+ micStatus('Starting a new microphone recognition session…');
+ startListening();
+};
 $('assistantToggle').onclick=toggleAssistant;
 $('voiceForm').onsubmit=e=>{e.preventDefault();command($('commandInput').value)};
 window.addEventListener('pagehide',()=>stopListening());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&micEnabled)resumeMic(1000)});
 
+$('retryAI').onclick=()=>{
+  if(!cameraStream){startLive();return;}
+  backendRecoveryAttempted=false;
+  if(window.tf?.getBackend?.()==='webgl'&&isMobileDevice())window.tf.setBackend('cpu').then(()=>window.tf.ready()).then(()=>{detector=null;detectorPromise=null;startLive()}).catch(err=>mobileVisionStatus('CPU retry failed: '+String(err)));
+  else {detector=null;detectorPromise=null;startLive();}
+};
+$('deviceCheck').onclick=()=>{
+ updateMobileCapabilities();
+ mobileVisionStatus('Camera '+(cameraStream?$('liveVideo').videoWidth+'×'+$('liveVideo').videoHeight:'not started')+
+  ', AI backend '+(window.tf?.getBackend?.()||'unavailable')+
+  ', recognition '+((window.SpeechRecognition||window.webkitSpeechRecognition)?'available':'unsupported')+
+  '. Try the separate Test microphone button to verify speech-to-text.');
+};
+updateMobileCapabilities();
 window.addEventListener('pagehide',()=>stopLive(true));
 
 $('analyze').onclick=run;

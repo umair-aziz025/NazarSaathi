@@ -193,7 +193,12 @@ export default function App() {
                  <input id="focusAssist" type="checkbox" defaultChecked />
                  <span><ScanSearch size={18}/> <strong>Focus assist</strong> <small>When no object is found, inspect the central area more closely. Experimental; may be slower.</small></span>
                </label>
-               <p id="visionDiagnostic" className="vision-diagnostic" aria-live="off">Camera ready. For better results, use the rear camera in good light.</p>
+               <p id="visionDiagnostic" className="vision-diagnostic" role="status" aria-live="polite">Camera ready. For better results, use the rear camera in good light.</p>
+              <div className="mobile-tools" role="group" aria-label="Mobile camera troubleshooting">
+                <button id="retryAI" type="button"><ScanSearch size={17}/> Retry AI on this device</button>
+                <button id="deviceCheck" type="button"><Settings2 size={17}/> Check device support</button>
+              </div>
+              <p id="deviceStatus" className="device-status" role="status" aria-live="polite">Checking browser compatibility…</p>
                <p className="recognition-disclaimer">Mobile cameras now request higher resolution when available. Focus assist can help some small centered objects, but not every object is supported and nothing here establishes a safe path.</p>
               <div className="camera-layout-option"><label htmlFor="cameraFillMode">Camera view</label><select id="cameraFillMode" defaultValue="cover"><option value="cover">Fill frame · full width</option><option value="contain">Show entire image</option></select></div>
               <div className="live-options">
@@ -219,7 +224,10 @@ export default function App() {
                 <p className="assistant-intro">Live descriptions are on by default. Ask questions or say “Pause descriptions” whenever you want quiet.</p>
                 <div className="langRow"><label htmlFor="speechLanguage"><Globe2 size={17}/> Speaking language</label><div className="lang-select"><select id="speechLanguage" defaultValue="ur"><option value="ur">اردو · Urdu</option><option value="en">English</option></select><ChevronDown size={15}/></div></div>
                 <button id="assistantToggle" type="button" className="assistbtn" aria-pressed="false"><Mic2 size={19}/> Start Hands-Free Assistant</button>
-                <div id="micStatus" className="micstate" role="status" aria-live="polite"><span className="muted-dot"/> Microphone off. Tap once to start listening.</div>
+                <button id="retryVoice" type="button" className="voice-retry"><Mic2 size={17}/> Tap to listen / Retry microphone</button>
+                <div id="micStatus" className="micstate" role="status" aria-live="polite">Microphone off. Tap once to start listening.</div>
+                <p id="voiceTranscript" className="voice-transcript" aria-live="polite">Last heard command: none</p>
+                <p className="mobile-browser-note">On Android, use Chrome directly. On iPhone, try Safari. Some WhatsApp and Facebook in-app browsers block speech recognition; open the link in the actual browser instead.</p>
                 <div id="voiceExamples" className="excommands"><span className="examples-title"><Sparkles size={14}/> THINGS YOU CAN SAY</span><div>“Enable vision” · “Select reading”</div><div>“Take a picture and read”</div><div>“Zoom in” · “Focus assist on”</div><div>“Next mode” · “Previous mode”</div><div>“Help” · “Speak Urdu”</div></div>
                 <details className="voice-command-guide">
                   <summary>All voice controls / تمام وائس کمانڈز <ChevronDown size={17}/></summary>
