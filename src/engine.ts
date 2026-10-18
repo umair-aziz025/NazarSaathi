@@ -525,13 +525,11 @@ function performVoiceControl(intent){
       'Try: what is in front of me; show entire image; fill camera frame; front camera; speak Urdu; reading mode; more detections; or undo last change.');return;
     case 'describe':describe();return;
     case 'startVision':
-      if(mode!=='look')voiceChangeMode('look');
-      else if(!cameraStream)startLive();
+      {const liveBefore=!!cameraStream;if(mode!=='look')voiceChangeMode('look');if(!liveBefore&&!cameraStream)startLive();}
       voiceAcknowledge('لائیو ویژن شروع ہو رہا ہے۔ میں سامنے نظر آنے والی چیزوں کے بارے میں بتاؤں گا۔','Live vision is starting. I will describe recognized objects.');
       return;
     case 'startReading':
-      if(mode!=='read')voiceChangeMode('read');
-      else if(!cameraStream)startLive();
+      {const liveBefore=!!cameraStream;if(mode!=='read')voiceChangeMode('read');if(!liveBefore&&!cameraStream)startLive();}
       voiceAcknowledge('لکھائی پڑھنے کا موڈ شروع ہو رہا ہے۔ کہیں: یہ پڑھو۔','Reading mode starting. Say read this while pointing the camera at text.');
       return;
     case 'nextMode':{
