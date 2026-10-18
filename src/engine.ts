@@ -12,6 +12,7 @@ let language='ur',asr=null,micEnabled=false,micOn=false,speakingNow=false,asrRet
 let cameraStream=null, liveTimer=null, liveRun=0, liveBusy=false, liveFrameNumber=0, livePreviousSignature='', liveCandidate='', liveCandidateCount=0, liveLastSaid=0, liveLastStatus=0, liveClock=0, detectorPromise=null;
 const names={gate:['Welcome Point','استقبالیہ گیٹ'],lobby:['Reception','استقبالیہ'],library:['Library','لائبریری'],helpdesk:['Help Desk','مدد کا کاؤنٹر'],lab:['Computer Lab','کمپیوٹر لیب']};
 const paths={gate:['lobby'],lobby:['gate','library','helpdesk','lab'],library:['lobby'],helpdesk:['lobby'],lab:['lobby']};
+let modelType='lite_mobilenet_v2',modelPromise=null,classificationModel=null,classificationBusy=false;
 const labels={person:'شخص',chair:'کرسی','dining table':'میز',bottle:'بوتل',cup:'کپ',book:'کتاب','cell phone':'موبائل فون',laptop:'لیپ ٹاپ',backpack:'بیگ',keyboard:'کی بورڈ',mouse:'ماؤس',car:'گاڑی',bus:'بس',dog:'کتا',cat:'بلی','potted plant':'گملے کا پودا',bench:'بینچ',handbag:'ہینڈ بیگ',bicycle:'سائیکل',clock:'گھڑی',tv:'ٹی وی',umbrella:'چھتری',apple:'سیب'};
 const posUr={left:'بائیں جانب',center:'درمیان',right:'دائیں جانب'};
 function status(t){$('resultState').textContent=t}
@@ -88,6 +89,7 @@ function publishLive(ur,en,details,signature){
 }
 function drawDetections(detections,width,height){
  const c=$('liveOverlay');if(c.width!==width||c.height!==height){c.width=width;c.height=height;}
+const v=$('liveVideo');if(v&&v.videoWidth&&v.videoHeight){const ar=v.videoWidth/v.videoHeight,box=c.getBoundingClientRect(),ratio=box.width/Math.max(1,box.height);const dw=ratio>ar?box.height*ar:box.width,dh=ratio>ar?box.height:box.width/ar;c.style.width=dw+'px';c.style.height=dh+'px';c.style.left=((box.width-dw)/2)+'px';c.style.top=((box.height-dh)/2)+'px';}
  const ctx=c.getContext('2d');ctx.clearRect(0,0,width,height);
  ctx.lineWidth=Math.max(2,width/280);ctx.font='bold '+Math.max(13,Math.round(width/36))+'px system-ui';
  for(const d of detections){
@@ -137,7 +139,7 @@ async function startLive(){
   const tracks=cameraStream.getVideoTracks();if(tracks[0])tracks[0].onended=()=>{if(cameraStream){stopLive();status('Camera was disconnected')}};
   if(mode==='look'){
    if(!window.cocoSsd||!window.tf)throw Error('Vision model libraries did not load. Connect to the internet and refresh the page.');
-   if(!detector){status('Loading AI detector. Camera is already live…');detectorPromise ||= cocoSsd.load({base:'lite_mobilenet_v2'}).catch(err=>{detectorPromise=null;throw err});detector=await detectorPromise;}
+   if(!detector){status('Loading AI detector. Camera is already live…');detectorPromise ||= cocoSsd.load({base:modelType}).catch(err=>{detectorPromise=null;throw err});detector=await detectorPromise;}
    if(run!==liveRun)return;
    status('Live object detection active');
   }else if(mode==='guide'){status('Live QR scanning active');}
@@ -153,7 +155,8 @@ async function processLive(run){
  try{
   const w=video.videoWidth,h=video.videoHeight;
   if(mode==='look'){
-   const detections=(await detector.detect(video)).filter(d=>d.score>=.48).sort((a,b)=>b.score-a.score).slice(0,8);
+   const minScore=Number($('detectSensitivity')?.value||0.35);
+   const detections=(await detector.detect(video)).filter(d=>d.score>=minScore).sort((a,b)=>b.score-a.score).slice(0,10);
    if(run!==liveRun)return;
    recentObjects=detections.map(d=>({...d,side:(d.bbox[0]+d.bbox[2]/2)/w<.33?'left':(d.bbox[0]+d.bbox[2]/2)/w>.67?'right':'center'}));objectsAt=Date.now();
    drawDetections(detections,w,h);++liveFrameNumber;
@@ -318,6 +321,57 @@ function command(raw){
  if(found){findItem(found,synonyms[found]);return}
  respond('میں ابھی اس سوال کو نہیں سمجھ سکا۔ آپ پوچھ سکتے ہیں: سامنے کیا ہے، یا بوتل کہاں ہے۔','I did not understand that request. Ask what I see, find an object, or read a sign.');
 }
+
+async function identifyMore(){
+ if(classificationBusy)return;
+ if(!cameraStream||!$('liveVideo')?.videoWidth){respond('پہلے کیمرہ شروع کریں۔','Start the live camera before identifying more objects.');return;}
+ if(!window.mobilenet){respond('مزید شناخت کا ماڈل ابھی لوڈ نہیں ہوا۔','The supplementary classification model is unavailable. Check your internet connection.');return;}
+ classificationBusy=true;$('identifyMore').disabled=true;status('Loading broader image classification model…');
+ try{
+   classificationModel ||= await window.mobilenet.load({version:2,alpha:0.75});
+   const predictions=await classificationModel.classify($('liveVideo'),4);
+   const items=predictions.filter(x=>x.probability>=.12).slice(0,3);
+   if(!items.length){respond('میں تصویر کی واضح شناخت نہیں کر سکا۔','I could not classify this camera image.');return;}
+   const names=items.map(x=>x.className.split(',')[0]);
+   respond('ممکنہ چیزیں: '+names.join('، ')+'۔ یہ اندازہ ہے، تصدیق نہیں۔',
+     'Possible image categories: '+names.join(', ')+'. These are whole-image guesses, not located objects.',
+     items.map(x=>x.className+' · '+Math.round(x.probability*100)+'% classifier score').join('\n'));
+ }catch(e){respond('مزید شناخت ابھی دستیاب نہیں۔','Additional recognition is temporarily unavailable.');}
+ finally{classificationBusy=false;$('identifyMore').disabled=false;}
+}
+$('identifyMore').onclick=identifyMore;
+$('visionModel').onchange=()=>{
+ modelType=$('visionModel').value;
+ detector=null;detectorPromise=null;
+ if(cameraStream){stopLive(true);startLive();}
+};
+window.addEventListener('nazarsaathi:hear-invitation',async()=>{
+ // This action comes from an explicit tap, not silent autoplay.
+ stopSpeech(false);
+ const speak=(t,lang)=>new Promise(resolve=>{
+   if(!window.speechSynthesis){resolve();return;}
+   const u=new SpeechSynthesisUtterance(t);u.lang=lang;u.rate=.84;
+   u.onend=resolve;u.onerror=resolve;
+   window.speechSynthesis.speak(u);
+ });
+ await speak('Welcome to NazarSaathi. Would you like to enable the hands free voice assistant and camera? Tap the large start button to continue.','en-US');
+ await speak('نظر ساتھی میں خوش آمدید۔ کیا آپ آواز کی سہولت اور کیمرہ شروع کرنا چاہتے ہیں؟','ur-PK');
+});
+window.addEventListener('nazarsaathi:guided-start',()=>{
+ // This event is dispatched synchronously from the first consent tap.
+ micBlocked=false;
+ language='en';$('speechLanguage').value='en';$('speechLive').checked=false;
+ const hasASR=!!(window.SpeechRecognition||window.webkitSpeechRecognition);
+ if(hasASR){micEnabled=true;setMicButton();startListening();}
+ else micStatus('This browser does not support speech recognition. Camera and typed commands are still available.');
+ startLive();
+ if(window.speechSynthesis){
+   const u=new SpeechSynthesisUtterance('NazarSaathi started. The camera is starting. You can ask what is in front of you. Urdu is also available.');u.lang='en-US';u.rate=.86;
+   u.onend=()=>{if(micEnabled)resumeMic(700);};
+   window.speechSynthesis.cancel();window.speechSynthesis.speak(u);
+ }
+});
+
 $('assistantToggle').onclick=toggleAssistant;
 $('voiceForm').onsubmit=e=>{e.preventDefault();command($('commandInput').value)};
 window.addEventListener('pagehide',()=>stopListening());

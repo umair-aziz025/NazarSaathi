@@ -1,0 +1,38 @@
+
+/* Mobile-first live camera and accessible bilingual onboarding */
+.welcome-backdrop{position:fixed;inset:0;z-index:2000;background:rgba(4,16,24,.82);display:grid;place-items:center;padding:16px;overflow-y:auto}
+.welcome-dialog{width:min(520px,100%);max-height:calc(100dvh - 32px);overflow-y:auto;background:#fff;color:#16313a;border-radius:22px;padding:clamp(21px,5vw,34px);box-shadow:0 20px 100px #0008;border:2px solid #68d2bf}
+.welcome-badge{display:flex;gap:9px;align-items:center;color:#075e54;font-weight:850;font-size:13px}.welcome-dialog h2{font:800 clamp(27px,5vw,37px) Manrope,sans-serif;line-height:1.2;margin:22px 0 11px}.welcome-dialog p{font-size:15px;line-height:1.7;margin:0 0 14px;color:#34535e}.welcome-dialog .welcome-urdu{font-family:'Noto Naskh Arabic',serif;font-size:22px;line-height:2;color:#153d37;background:#e9f7f2;border-radius:12px;padding:10px 15px}
+.welcome-dialog .welcome-caution{font-size:13px}.welcome-primary{border:0;border-radius:13px;background:#075e54;color:#fff;padding:20px;display:flex;align-items:center;justify-content:center;gap:11px;font-size:16px;font-weight:850;width:100%;min-height:68px;text-align:center}.welcome-actions{display:grid;gap:8px;margin:12px 0}.welcome-actions button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border:1px solid #a3d0c5;background:#f0faf6;color:#174c45;border-radius:12px;font-weight:700}.welcome-dialog .welcome-note{font-size:12px;color:#45636b;display:flex;align-items:flex-start;gap:9px;margin-top:17px}.welcome-dialog .welcome-note svg{flex-shrink:0;margin-top:3px}
+.recognition-settings{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:15px}.recognition-settings label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:750;color:var(--ink,#d3eaf0)}.recognition-settings label svg{display:inline;color:var(--accent,#67dac7)}.recognition-settings select{width:100%;padding:12px;background:var(--inner,#0a2737);color:var(--ink,#eaf4f7);border:1px solid var(--border,#3f6371);border-radius:10px;font-size:13px}.recognition-disclaimer{color:var(--secondary,#9ab5c4);font-size:12px;line-height:1.55;margin:10px 0 15px}
+.camera-shell{position:absolute;inset:0;display:block;width:100%;height:100%;overflow:hidden;background:#02060b}.camera-shell video{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain}.camera-shell canvas{position:absolute;pointer-events:none}.camera-shell[hidden]{display:none!important}.camera-stage:has(.camera-shell:not([hidden])) .stage-empty{display:none}.camera-stage{min-width:0;overflow:hidden;isolation:isolate}.camera-shell .camera-info{z-index:2}.camera-shell .cam-bottom{z-index:2}
+.live-buttons{display:flex;flex-wrap:wrap;gap:9px}.live-buttons button{min-width:0;flex:1 1 125px;min-height:48px}
+@media(max-width:780px){
+ .hero{min-height:auto}.hero-visual{display:none}
+ .app-section{padding-top:15px}.app-grid{display:flex;flex-direction:column}
+ .studio-panel{order:0}.right-column{display:flex;flex-direction:column}
+ .camera-stage{width:100%;aspect-ratio:3/4;min-height:0;max-height:min(70dvh,620px)}
+ .studio-panel .panel-topline{gap:7px}
+ .studio-panel .mode-bar{margin-top:15px}
+ .live-action{min-height:62px;font-size:16px}
+ .live-buttons button{font-size:13px}
+ .recognition-settings{grid-template-columns:1fr 1fr}
+ .camera-info,.cam-bottom{font-size:11px!important}
+ .section-intro{margin-bottom:14px}
+}
+@media(max-width:450px){
+ .hero{padding-top:28px;padding-bottom:13px}.hero-copy p{font-size:14px}
+ .camera-stage{aspect-ratio:4/5;max-height:69dvh}
+ .recognition-settings{grid-template-columns:1fr}
+ .mode-bar .mode{min-height:58px}
+ .live-buttons button{flex-basis:100%;min-height:48px}
+ .studio-panel,.assistant-console,.response-panel{padding:15px}
+ .welcome-backdrop{padding:9px}
+ .welcome-dialog{padding:19px;max-height:calc(100dvh - 18px)}
+ .welcome-dialog h2{margin-top:16px}
+}
+@media(orientation:landscape) and (max-height:520px){
+ .welcome-backdrop{place-items:start center}.welcome-dialog{max-height:none}
+ .camera-stage{aspect-ratio:16/9;max-height:78dvh}
+}
+@media(prefers-reduced-motion:reduce){.welcome-backdrop *{animation:none!important;transition:none!important}}

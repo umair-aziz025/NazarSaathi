@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Accessibility, ArrowDownRight, ArrowLeftRight, ArrowRight, AudioLines,
   BookOpenText, Camera, Check, ChevronDown, CircleHelp, Compass, Ear, Eye,
   FileImage, Globe2, Headphones, HeartHandshake, Keyboard, Layers3, LockKeyhole,
   MapPinned, Mic2, PauseCircle, Play, Scan, ScanEye, ShieldCheck, Sparkles,
-  Square, Volume2, Waves, Wifi, Zap, Sun, Moon, Leaf, Contrast
+  Square, Volume2, Waves, Wifi, Zap, Sun, Moon, Leaf, Contrast, Smartphone, ScanSearch, Settings2
 } from 'lucide-react';
 import { initializeEngine } from './engine';
 import AnimatedHeadline from './components/AnimatedHeadline';
 import './App.css';
 import './themes.css';
+import './accessibility.css';
 
 function Orb({ variant = 'a' }: { variant?: 'a'|'b' }) {
   return <div className={'orb orb-'+variant} aria-hidden="true" />;
@@ -43,7 +44,18 @@ const appear = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0 } };
 
 export default function App() {
   const [theme, setTheme] = useState<ThemeName>(getInitialTheme);
+  const [welcomeOpen, setWelcomeOpen] = useState(true);
+  const welcomeStart = useRef<HTMLButtonElement>(null);
   useEffect(() => { initializeEngine(); }, []);
+  useEffect(() => { if (welcomeOpen) welcomeStart.current?.focus(); }, [welcomeOpen]);
+  function startGuided() {
+    // The first explicit tap unlocks browser camera, microphone and audio permissions.
+    window.dispatchEvent(new Event('nazarsaathi:guided-start'));
+    setWelcomeOpen(false);
+  }
+  function hearInvitation() {
+    window.dispatchEvent(new Event('nazarsaathi:hear-invitation'));
+  }
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme === 'midnight' || theme === 'contrast' ? 'dark' : 'light';
@@ -54,6 +66,25 @@ export default function App() {
 
   return (
     <div className="site-shell">
+      {welcomeOpen && (
+        <div className="welcome-backdrop">
+          <section className="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="welcome-title" aria-describedby="welcome-description">
+            <div className="welcome-badge"><ScanEye size={25}/> NazarSaathi · Accessible start</div>
+            <h2 id="welcome-title">Welcome to NazarSaathi</h2>
+            <p id="welcome-description">Would you like to enable voice recognition and start the camera? Your browser will ask for permission.</p>
+            <p className="welcome-urdu" lang="ur" dir="rtl">نظر ساتھی میں خوش آمدید۔ کیا آپ آواز سے بات چیت اور کیمرہ استعمال کرنا چاہتے ہیں؟</p>
+            <p className="welcome-caution">For security, your phone requires one tap before listening or speaking. We never activate the microphone silently.</p>
+            <button ref={welcomeStart} type="button" className="welcome-primary" onClick={startGuided}>
+              <Mic2 size={23}/> Start voice &amp; camera · آواز شروع کریں
+            </button>
+            <div className="welcome-actions">
+              <button type="button" onClick={hearInvitation}><Volume2 size={18}/> Hear English + Urdu invitation</button>
+              <button type="button" onClick={()=>setWelcomeOpen(false)}>Continue without voice</button>
+            </div>
+            <p className="welcome-note"><ShieldCheck size={16}/> Not intended for road crossing or obstacle avoidance. Voice recognition may use your browser provider's service.</p>
+          </section>
+        </div>
+      )}
       <Orb/><Orb variant="b"/>
       <div className="grain" aria-hidden="true" />
       <header className="site-header">
@@ -134,8 +165,28 @@ export default function App() {
               </div>
 
               <button id="startLive" type="button" className="live-action"><Camera size={21}/> Start Live Camera <ArrowRight size={19}/></button>
-              <div className="live-buttons" id="liveButtons" hidden><button id="captureFrame" type="button"><FileImage size={16}/> Capture &amp; analyze</button><button id="stopLive" type="button"><Square size={15}/> Stop camera</button></div>
+              <div className="live-buttons" id="liveButtons" hidden>
+                <button id="captureFrame" type="button"><FileImage size={16}/> Capture &amp; analyze</button>
+                <button id="identifyMore" type="button"><ScanSearch size={16}/> Identify more</button>
+                <button id="stopLive" type="button"><Square size={15}/> Stop camera</button>
+              </div>
 
+              <div className="recognition-settings">
+                <label htmlFor="visionModel"><Settings2 size={16}/> Recognition model
+                  <select id="visionModel" defaultValue="lite_mobilenet_v2">
+                    <option value="lite_mobilenet_v2">Fast · Mobile</option>
+                    <option value="mobilenet_v2">Detailed · Slower</option>
+                  </select>
+                </label>
+                <label htmlFor="detectSensitivity">Detection sensitivity
+                  <select id="detectSensitivity" defaultValue="0.35">
+                    <option value="0.28">More results</option>
+                    <option value="0.35">Balanced</option>
+                    <option value="0.5">Higher confidence</option>
+                  </select>
+                </label>
+              </div>
+              <p className="recognition-disclaimer">Detailed mode is slower. Detection supports a limited set of object types; “Identify more” gives experimental whole-image labels without positions.</p>
               <div className="live-options">
                 <label htmlFor="cameraSide" className="field-label"><ArrowLeftRight size={16}/> Camera <span className="select-box"><select id="cameraSide" defaultValue="environment"><option value="environment">Back camera</option><option value="user">Front camera</option></select><ChevronDown size={13}/></span></label>
                 <label htmlFor="speechLive" className="checkbox-label"><input id="speechLive" type="checkbox" defaultChecked/><span className="faux-check"><Check size={12}/></span><Volume2 size={15}/> Auto narrate</label>
