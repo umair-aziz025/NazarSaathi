@@ -12,6 +12,7 @@ import AnimatedHeadline from './components/AnimatedHeadline';
 import './App.css';
 import './themes.css';
 import './accessibility.css';
+import './voiceGuide.css';
 
 function Orb({ variant = 'a' }: { variant?: 'a'|'b' }) {
   return <div className={'orb orb-'+variant} aria-hidden="true" />;
@@ -138,7 +139,7 @@ export default function App() {
           </div>
 
           <div className="app-grid">
-            <section className="studio-panel">
+            <section className="studio-panel" aria-label="Live camera and vision controls">
               <div className="panel-topline"><div className="panel-name"><span className="panel-icon"><Scan size={20}/></span><div><span className="panel-overline">VISION ENGINE</span><h3>Live experience</h3></div></div><span className="engine-badge"><span className="live-pulse"/> READY TO SCAN</span></div>
               <div className="mode-bar" role="group" aria-label="Vision mode">
                 <button type="button" className="mode" data-mode="look" aria-pressed="true"><Eye size={19}/><span>Live vision</span></button>
@@ -171,7 +172,7 @@ export default function App() {
                 <button id="stopLive" type="button"><Square size={15}/> Stop camera</button>
               </div>
 
-              <div className="recognition-settings">
+              <div className="recognition-settings" role="group" aria-label="Object recognition model and sensitivity controls">
                 <label htmlFor="visionModel"><Settings2 size={16}/> Recognition model
                   <select id="visionModel" defaultValue="lite_mobilenet_v2">
                     <option value="lite_mobilenet_v2">Fast · Mobile</option>
@@ -210,11 +211,36 @@ export default function App() {
                 <button id="assistantToggle" type="button" className="assistbtn" aria-pressed="false"><Mic2 size={19}/> Start Hands-Free Assistant</button>
                 <div id="micStatus" className="micstate" role="status" aria-live="polite"><span className="muted-dot"/> Microphone off. Tap once to start listening.</div>
                 <div id="voiceExamples" className="excommands"><span className="examples-title"><Sparkles size={14}/> THINGS YOU CAN SAY</span><div>“What is in front of me?”</div><div>“Where is my bottle?”</div><div>“Read this” · “Speak Urdu”</div><div>“Help”</div></div>
+                <details className="voice-command-guide">
+                  <summary>All voice controls / تمام وائس کمانڈز <ChevronDown size={17}/></summary>
+                  <div className="voice-guide-body">
+                    <p><strong>To hear the full menu:</strong> say “Available functions” or “اختیارات بتاؤ”. Say “Current settings” to hear the current state, or “Undo last change” to go back.</p>
+                    <div className="voice-guide-grid">
+                      <div lang="en">
+                        <strong>English</strong>
+                        <p>“Show entire image” · “Fill camera frame” · “Front camera” · “Back camera”</p>
+                        <p>“Object detection mode” · “Reading mode” · “Checkpoint mode”</p>
+                        <p>“Fast model” · “Detailed model” · “More detections” · “Balanced sensitivity”</p>
+                        <p>“Auto narration on” · “Auto narration off” · “Speak Urdu” · “Speak English”</p>
+                        <p>“White theme” · “Dark theme” · “Read this” · “Read the results” · “Help”</p>
+                      </div>
+                      <div lang="ur" dir="rtl">
+                        <strong>اردو</strong>
+                        <p>”پوری تصویر دکھاؤ“ · ”کیمرہ فل کرو“ · ”فرنٹ کیمرہ“ · ”بیک کیمرہ“</p>
+                        <p>”پڑھنے کا موڈ“ · ”شناخت والا موڈ“ · ”چیک پوائنٹ موڈ“</p>
+                        <p>”تیز ماڈل“ · ”بہتر ماڈل“ · ”زیادہ چیزیں“</p>
+                        <p>”خودکار آواز چالو“ · ”خودکار آواز بند“ · ”انگریزی بولو“</p>
+                        <p>”سفید تھیم“ · ”پچھلی سیٹنگ“ · ”سامنے کیا ہے؟“</p>
+                      </div>
+                    </div>
+                    <p className="voice-guide-note">Speech recognition supports one language at a time. Say “Speak Urdu” while English is active, or “انگریزی بولو” while Urdu recognition is active. Accuracy varies by browser and network. Changes are confirmed aloud.</p>
+                  </div>
+                </details>
                 <form id="voiceForm" className="assistform"><label htmlFor="commandInput" className="srOnly">Ask NazarSaathi</label><input id="commandInput" type="text" placeholder="Type a command..." autoComplete="off"/><button type="submit" aria-label="Send command"><ArrowRight size={20}/></button></form>
                 <div className="assistant-foot"><LockKeyhole size={15}/> Your camera frames are not uploaded to our server. Voice recognition and online Urdu TTS may use third-party services.</div>
               </section>
 
-              <section className="response-panel">
+              <section className="response-panel" aria-label="Spoken results and analysis">
                 <div className="response-heading"><span className="response-icon"><Headphones size={20}/></span><div><span className="panel-overline">WHAT NAZARSAATHI SAYS</span><h3>Live insights</h3></div><span className="waveform" aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/></span></div>
                 <div className="insight-status"><span className="status-mini"/><span id="resultState" role="status">Waiting for an image</span></div>
                 <div className="response-content"><div className="urdu" id="urdu" lang="ur" dir="rtl" aria-live="polite">اپنی تصویر منتخب کریں۔</div><div className="english" id="english" aria-live="polite">Start the camera for live detection, or choose a photo.</div><div className="details" id="details" hidden /></div>
@@ -225,7 +251,7 @@ export default function App() {
           </div>
 
           <div className="lower-grid">
-            <section className="checkpoints-panel">
+            <section className="checkpoints-panel" aria-label="Demo QR checkpoint options">
               <div className="mini-icon"><Compass size={23}/></div><div className="checkpoint-main"><h3>Explore checkpoints</h3><p>Test QR-based location announcements with fictional campus markers. A safe way to demonstrate structured wayfinding.</p>
               <div className="markerbtns"><button type="button" data-marker="gate">Welcome Point</button><button type="button" data-marker="lobby">Reception</button><button type="button" data-marker="library">Library</button><button type="button" data-marker="helpdesk">Help Desk</button><button type="button" data-marker="lab">Computer Lab</button></div><div id="qrout"/></div>
             </section>

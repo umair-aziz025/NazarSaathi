@@ -1,0 +1,17 @@
+
+/* Bilingual voice command directory: keyboard/screen-reader friendly */
+.voice-command-guide{margin:13px 0 10px;border:1px solid var(--border,#315361);border-radius:12px;background:var(--inner,#0a2737);color:var(--ink,#eef9ff);overflow:hidden}
+.voice-command-guide summary{cursor:pointer;min-height:48px;padding:13px 15px;display:flex;gap:8px;align-items:center;justify-content:space-between;font-weight:800;font-size:13px;list-style:none}
+.voice-command-guide summary::-webkit-details-marker{display:none}
+.voice-command-guide summary svg{flex-shrink:0;transition:transform .2s}
+.voice-command-guide[open] summary svg{transform:rotate(180deg)}
+.voice-command-guide summary:focus-visible{outline:3px solid #f6c379;outline-offset:-4px}
+.voice-command-guide .voice-guide-body{border-top:1px solid var(--border,#315361);padding:15px;color:var(--secondary,#adc9d6)}
+.voice-guide-body p{font-size:12px;line-height:1.8;margin:0 0 12px}
+.voice-guide-grid{display:grid;grid-template-columns:1fr 1fr;gap:17px}
+.voice-guide-grid strong{display:block;font-size:13px;color:var(--ink,#eef9ff);margin-bottom:8px}
+.voice-guide-grid [lang="ur"]{font-family:'Noto Naskh Arabic','Segoe UI',sans-serif;font-size:14px}
+.voice-guide-grid [lang="ur"] p{font-size:15px;line-height:2}
+.voice-guide-note{border-top:1px solid var(--border,#315361);padding-top:12px;margin-top:9px!important}
+@media(max-width:610px){.voice-guide-grid{grid-template-columns:1fr}.voice-guide-body{padding:12px}.voice-guide-grid [lang="ur"] p{font-size:16px}}
+@media(prefers-reduced-motion:reduce){.voice-command-guide summary svg{transition:none}}

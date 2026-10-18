@@ -4,6 +4,8 @@
    Browser AI dependencies load from script tags in index.html.
 */
 // @ts-nocheck
+import { parseVoiceControl } from './voiceCommands';
+
 export function initializeEngine(): void {
 'use strict';
 const $=id=>document.getElementById(id);
@@ -83,7 +85,7 @@ function publishLive(ur,en,details,signature){
  $('details').hidden=!details;
  $('speak').disabled=false;
  const now=Date.now();
- if($('speechLive').checked && (signature!==livePreviousSignature || now-liveLastSaid>=17000) && now-liveLastSaid>=5500){
+ if($('speechLive').checked && !speakingNow && (signature!==livePreviousSignature || now-liveLastSaid>=25000) && now-liveLastSaid>=(micEnabled?20000:8500)){
    say();liveLastSaid=now;livePreviousSignature=signature;
  }
 }
@@ -330,9 +332,159 @@ async function scanByVoice(){
  try{const qr=await readQR($('liveVideo'));if(!qr.startsWith('NAZARSAATHI:DEMO:'))throw Error('unsupported');reportCheckpoint(qr)}
  catch(e){respond('مجھے ڈیمو کیو آر نشان نہیں ملا۔','No supported demo QR checkpoint was visible.');}
 }
+
+/* Voice navigation for every primary user-facing feature.
+   Confirm actions out loud; retain one previous setting for "undo".
+   A browser's microphone permission cannot be bypassed, even by this router. */
+let lastVoiceSetting=null;
+const voiceAcknowledge=(ur,en,extra='')=>respond(ur,en,extra);
+function voiceSetting(label,oldValue,restore){
+ lastVoiceSetting={label,oldValue,restore};
+}
+function voiceSet(id,value,eventName='change'){
+ const target=$(id);
+ if(!target)return false;
+ const oldValue=target.type==='checkbox'?target.checked:target.value;
+ voiceSetting(id,oldValue,()=>{
+   if(target.type==='checkbox')target.checked=oldValue;else target.value=oldValue;
+   target.dispatchEvent(new Event(eventName,{bubbles:true}));
+ });
+ if(target.type==='checkbox')target.checked=value;else target.value=value;
+ target.dispatchEvent(new Event(eventName,{bubbles:true}));
+ return true;
+}
+function voiceChangeMode(id){
+ const button=document.querySelector('[data-mode="'+id+'"]');
+ if(!button)return;
+ const previous=mode,wasLive=!!cameraStream;
+ voiceSetting('mode',previous,()=>{
+   document.querySelector('[data-mode="'+previous+'"]')?.click();
+   if(wasLive)startLive();
+ });
+ button.click();
+ if(wasLive)startLive();
+}
+function voiceFocus(selector,ur,en){
+ const el=document.querySelector(selector);
+ if(!el){voiceAcknowledge('یہ حصہ ابھی دستیاب نہیں۔','That section is currently unavailable.');return;}
+ if(!el.hasAttribute('tabindex'))el.setAttribute('tabindex','-1');
+ el.focus({preventScroll:true});
+ el.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});
+ voiceAcknowledge(ur,en);
+}
+function currentVoiceStatus(){
+ const m={look:'live vision',read:'text reading',guide:'demo checkpoints'};
+ const mu={look:'چیزوں کی شناخت',read:'لکھائی پڑھنا',guide:'ڈیمو چیک پوائنٹ'};
+ const fit=$('cameraFillMode').value==='cover'?'fill frame':'entire image';
+ const urfit=$('cameraFillMode').value==='cover'?'مکمل فریم':'مکمل تصویر';
+ voiceAcknowledge(
+  'موجودہ موڈ '+mu[mode]+' ہے۔ کیمرہ '+(cameraStream?'چالو':'بند')+' ہے۔ تصویر '+urfit+' میں ہے۔ آواز کی زبان '+(language==='ur'?'اردو':'انگریزی')+' ہے۔',
+  'Mode: '+m[mode]+'. Camera: '+(cameraStream?'on':'off')+'. View: '+fit+'. Speech: '+(language==='ur'?'Urdu':'English')+'. Microphone: '+(micEnabled?'on.':'off.')
+ );
+}
+function performVoiceControl(intent){
+ const value=intent.value;
+ switch(intent.action){
+  case 'language':changeLanguage(value,true);return;
+  case 'listening':
+   if(value==='start'){
+     if(micEnabled)voiceAcknowledge('مائیکروفون پہلے ہی چل رہا ہے۔','Microphone is already on.');
+     else toggleAssistant();
+     return;
+   }
+   stopListening();voiceAcknowledge('مائیکروفون بند کر دیا گیا ہے۔ اسے دوبارہ چلانے کے لیے وائس اسسٹنٹ کا بڑا بٹن دبائیں۔','Microphone is off. Press the large voice assistant button to enable listening again.');return;
+  case 'action':
+   switch(value){
+    case 'undo':
+      if(!lastVoiceSetting){voiceAcknowledge('کوئی پچھلی سیٹنگ موجود نہیں۔','There is no previous setting to restore.');return;}
+      const u=lastVoiceSetting;lastVoiceSetting=null;
+      try{u.restore();voiceAcknowledge('پچھلی سیٹنگ بحال کر دی گئی ہے۔','Previous setting restored.');}catch(err){voiceAcknowledge('سیٹنگ واپس نہیں ہو سکی۔','Could not restore that setting.');}return;
+    case 'status':currentVoiceStatus();return;
+    case 'features':
+      voiceAcknowledge('میں کیمرہ، تصویر کا منظر، سامنے یا پیچھے والا کیمرہ، شناخت کا ماڈل، حساسیت، آواز، اردو یا انگریزی، پڑھنے کا موڈ، چیک پوائنٹ اور تھیم تبدیل کر سکتا ہوں۔ کہیں: مدد کرو۔',
+      'You can control camera on or off, camera view, front or back camera, vision and reading mode, model, sensitivity, auto narration, Urdu or English speech, themes and demo checkpoints. Say help for example commands.');return;
+    case 'help':
+      voiceAcknowledge('کہیں: سامنے کیا ہے؟ پوری تصویر دکھاؤ۔ کیمرہ فل کرو۔ سامنے والا کیمرہ۔ اردو بولو۔ لکھائی پڑھو۔ زیادہ نتائج۔ یا پچھلی سیٹنگ۔',
+      'Try: what is in front of me; show entire image; fill camera frame; front camera; speak Urdu; reading mode; more detections; or undo last change.');return;
+    case 'capture':
+      if(!cameraStream)voiceAcknowledge('فریم لینے کے لیے کیمرہ چلائیں۔','Start the camera before capturing a frame.');
+      else captureLiveFrame();
+      return;
+    case 'identify':
+      if(!cameraStream)voiceAcknowledge('مزید شناخت کے لیے کیمرہ چلائیں۔','Start the camera before identifying more categories.');
+      else identifyMore();return;
+    case 'analyze':
+      if(!$('analyze').disabled)run();
+      else voiceAcknowledge('پہلے تصویر منتخب کرنا ضروری ہے۔ بغیر تصویر منتخب کیے بھی لائیو کیمرہ استعمال کر سکتے ہیں۔','Please select an uploaded photo first, or use the live camera instead.');return;
+    case 'scan':scanByVoice();return;
+    case 'read':readByVoice($('ocrLang').value);return;
+    case 'readUrdu':voiceSet('ocrLang','urd');readByVoice('urd');return;
+   }return;
+  case 'camera':
+    if(value==='start'){if(cameraStream)voiceAcknowledge('کیمرہ پہلے ہی چل رہا ہے۔','The camera is already running.');else{startLive();voiceAcknowledge('کیمرہ شروع کیا جا رہا ہے۔','Starting the camera.');}return;}
+    if(value==='stop'){if(cameraStream)stopLive();voiceAcknowledge('کیمرہ بند کر دیا گیا ہے۔','Camera stopped.');return;}
+    if(value==='front'||value==='back'){
+      voiceSet('cameraSide',value==='front'?'user':'environment');
+      voiceAcknowledge(value==='front'?'سامنے والا کیمرہ منتخب ہو گیا ہے۔':'پیچھے والا کیمرہ منتخب ہو گیا ہے۔',value==='front'?'Front camera selected.':'Back camera selected.');return;
+    }
+    if(value==='fill'||value==='entire'){
+      voiceSet('cameraFillMode',value==='fill'?'cover':'contain');
+      voiceAcknowledge(value==='fill'?'کیمرہ اب پورے فریم میں نظر آئے گا، کنارے کٹ سکتے ہیں۔':'پوری کیمرہ تصویر دکھائی جائے گی، اطراف میں خالی جگہ ہو سکتی ہے۔',
+       value==='fill'?'Camera now fills the frame. Some edges may be cropped.':'Entire camera image enabled. Side bars may appear.');return;
+    }return;
+  case 'mode':
+    voiceChangeMode(value);
+    voiceAcknowledge(value==='look'?'چیزیں دیکھنے کا موڈ شروع کیا۔':value==='read'?'لکھائی پڑھنے کا موڈ منتخب ہوا۔':'ڈیمو چیک پوائنٹ موڈ منتخب ہوا۔',
+      value==='look'?'Object recognition mode selected.':value==='read'?'Text reading mode selected.':'Demo checkpoint mode selected.');return;
+  case 'speech':
+    if(value==='repeat'){say();return;}
+    if(value==='stop'){stopSpeech();$('speechLive').checked=false;micStatus('Narration stopped; microphone controls remain enabled.');return;}
+    voiceSet('speechLive',value==='on');
+    voiceAcknowledge(value==='on'?'خودکار آواز شروع ہو گئی ہے۔':'خودکار آواز بند کر دی گئی ہے۔',value==='on'?'Automatic narration enabled.':'Automatic narration disabled.');return;
+  case 'model':
+    voiceSet('visionModel',value==='fast'?'lite_mobilenet_v2':'mobilenet_v2');
+    voiceAcknowledge(value==='fast'?'تیز ماڈل منتخب ہوا۔':'تفصیلی ماڈل منتخب ہوا۔ یہ سست ہو سکتا ہے۔',
+      value==='fast'?'Fast detection model selected.':'Detailed detection model selected. This may run more slowly.');return;
+  case 'sensitivity':{
+    const v=value==='more'?'0.28':value==='confidence'?'0.5':'0.35';
+    voiceSet('detectSensitivity',v);
+    voiceAcknowledge(value==='more'?'زیادہ چیزیں شناخت کرنے کی کوشش ہو گی، غلط نتائج بڑھ سکتے ہیں۔':value==='confidence'?'زیادہ یقین والے نتائج منتخب ہوئے۔':'متوازن شناخت منتخب ہوئی۔',
+      value==='more'?'Sensitivity increased. More false detections are possible.':value==='confidence'?'Higher confidence detections selected.':'Balanced sensitivity selected.');return;}
+  case 'ocrLanguage':
+    voiceSet('ocrLang',value);
+    voiceAcknowledge(value==='urd'?'متن پڑھنے کی زبان اردو منتخب ہوئی۔':'متن پڑھنے کی زبان انگریزی منتخب ہوئی۔',
+      value==='urd'?'OCR language set to Urdu.':'OCR language set to English.');return;
+  case 'theme':{
+    const name={'daylight':'Daylight','sea-glass':'Sea Glass','midnight':'Midnight','contrast':'Contrast'}[value];
+    const button=document.querySelector('[aria-label="Use '+name+' theme"]');
+    if(!button){voiceAcknowledge('تھیم کا بٹن نہیں ملا۔','Theme button not available.');return;}
+    const current=document.querySelector('.theme-choice[aria-pressed="true"]');
+    const previous=current?.getAttribute('aria-label');
+    voiceSetting('theme',previous,()=>{if(previous)document.querySelector('[aria-label="'+previous+'"]')?.click();});
+    button.click();
+    voiceAcknowledge('تھیم '+name+' منتخب ہو گیا ہے۔','Theme changed to '+name+'.');return;}
+  case 'destination':{
+    voiceChangeMode('guide');
+    voiceSet('destination',value);
+    const labels={gate:'Welcome Point',lobby:'Reception',library:'Library',helpdesk:'Help Desk',lab:'Computer Lab'};
+    voiceAcknowledge('ڈیمو منزل '+labels[value]+' منتخب ہوئی ہے۔ یہ اصلی راستہ نہیں ہے۔',
+      'Demo destination set to '+labels[value]+'. This is a fictional checkpoint demo, not real navigation.');return;}
+  case 'focus':
+    switch(value){
+     case 'camera':voiceFocus('.studio-panel','کیمرہ کنٹرول والا حصہ کھول دیا ہے۔','Focused camera controls.');return;
+     case 'voice':voiceFocus('.assistant-console','وائس اسسٹنٹ کا حصہ کھول دیا ہے۔','Focused voice assistant controls.');return;
+     case 'results':voiceFocus('.response-panel','نتائج کا حصہ کھول دیا ہے۔ کہیں: سامنے کیا ہے؟','Focused results. Say what is in front of me for a new scene description.');return;
+     case 'settings':voiceFocus('.recognition-settings','شناخت کی سیٹنگز کا حصہ کھول دیا ہے۔','Focused recognition settings.');return;
+     case 'checkpoints':voiceFocus('.checkpoints-panel','ڈیمو چیک پوائنٹ والا حصہ کھول دیا ہے۔','Focused the demo checkpoints section.');return;
+    }return;
+ }
+}
+
 function command(raw){
  const t=(raw||'').trim().toLowerCase();if(!t)return;
  const tm=Date.now();if(t===lastRecognized&&tm-lastRecognizedAt<1700)return;lastRecognized=t;lastRecognizedAt=tm;
+ const control=parseVoiceControl(raw);
+ if(control){performVoiceControl(control);return;}
  const has=(...words)=>words.some(w=>t.includes(w));
  if(has('stop listening','stop assistant','مائیک بند','سننا بند')){stopListening();respond('اب میں سننا بند کر رہا ہوں۔','I stopped listening.');return}
  if(has('speak english','switch to english','english please','انگریزی بولو','انگلش بولو','انگریزی میں')){changeLanguage('en',true);return}
@@ -395,11 +547,10 @@ window.addEventListener('nazarsaathi:guided-start',()=>{
  if(hasASR){micEnabled=true;setMicButton();startListening();}
  else micStatus('This browser does not support speech recognition. Camera and typed commands are still available.');
  startLive();
- if(window.speechSynthesis){
-   const u=new SpeechSynthesisUtterance('NazarSaathi started. The camera is starting. You can ask what is in front of you. Urdu is also available.');u.lang='en-US';u.rate=.86;
-   u.onend=()=>{if(micEnabled)resumeMic(700);};
-   window.speechSynthesis.cancel();window.speechSynthesis.speak(u);
- }
+ // Use the same narration pathway as all other commands: pause microphone
+ // while speaking to avoid transcribing the assistant's own voice.
+ respond('نظر ساتھی شروع ہو گیا ہے۔ دستیاب آپشن سننے کے لیے کہیں: اختیارات بتاؤ۔ انگریزی یا اردو کا انتخاب آواز سے کریں۔',
+         'NazarSaathi is starting. Say available functions to hear all voice commands. Say speak Urdu to change language.');
 });
 
 $('assistantToggle').onclick=toggleAssistant;
