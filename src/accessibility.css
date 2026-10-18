@@ -87,3 +87,25 @@
  .live-options .checkbox-label{min-height:46px}
  .narration-status{font-size:13px;line-height:1.6}
 }
+
+/* Mobile detection controls remain usable with speech and accessibility services. */
+.focus-assist-control{
+ display:flex;align-items:flex-start;gap:12px;margin:14px 0 8px;
+ background:var(--inner,#112e3c);color:var(--ink,#e9f8ff);
+ border:1px solid var(--border,#345666);border-radius:12px;
+ padding:13px;cursor:pointer;line-height:1.5;
+}
+.focus-assist-control input{accent-color:var(--accent,#60dcc2);width:20px;height:20px;flex:none;margin:3px 0}
+.focus-assist-control span{display:block;flex:1;min-width:0}
+.focus-assist-control span>svg{vertical-align:middle;margin-right:5px;color:var(--accent,#64d9c2)}
+.focus-assist-control strong{font-size:13px;font-weight:800}
+.focus-assist-control small{display:block;font-size:12px;color:var(--secondary,#b7cbd7);line-height:1.55;padding-top:3px}
+.vision-diagnostic{font-size:12px;line-height:1.6;color:var(--secondary,#b7cbd7);margin:7px 0 12px;overflow-wrap:anywhere}
+.live-buttons button#zoomIn,.live-buttons button#zoomOut{flex:0 1 85px;min-width:55px;font-size:14px;font-weight:800}
+@media(max-width:780px){
+ .live-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .live-buttons button{min-width:0;width:100%;min-height:49px}
+ .live-buttons button#zoomIn,.live-buttons button#zoomOut{min-width:0}
+ .live-buttons #stopLive{grid-column:1/-1}
+}
+@media(max-width:400px){.recognition-settings{grid-template-columns:1fr}}

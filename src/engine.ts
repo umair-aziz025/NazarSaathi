@@ -10,12 +10,35 @@ import { shouldNarrateScene } from './narrationPolicy';
 export function initializeEngine(): void {
 'use strict';
 const $=id=>document.getElementById(id);
-let mode='look', image=null, detector=null, response=null;
+let mode='look', previousMode='look', image=null, detector=null, response=null;
 let language='ur',asr=null,micEnabled=false,micOn=false,speakingNow=false,asrRetry=null,lastRecognized='',lastRecognizedAt=0,recentObjects=[],objectsAt=0,micBlocked=false;
 let cameraStream=null, liveTimer=null, liveRun=0, liveBusy=false, liveFrameNumber=0, livePreviousSignature='', liveCandidate='', liveCandidateCount=0, liveLastSaid=0, liveLastStatus=0, liveClock=0, detectorPromise=null;
 const names={gate:['Welcome Point','استقبالیہ گیٹ'],lobby:['Reception','استقبالیہ'],library:['Library','لائبریری'],helpdesk:['Help Desk','مدد کا کاؤنٹر'],lab:['Computer Lab','کمپیوٹر لیب']};
 const paths={gate:['lobby'],lobby:['gate','library','helpdesk','lab'],library:['lobby'],helpdesk:['lobby'],lab:['lobby']};
 let modelType='lite_mobilenet_v2',modelPromise=null,classificationModel=null,classificationBusy=false;
+const isMobileDevice=()=>/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+let lastFocusPass=0,zeroDetectionSince=0;
+function mobileVisionStatus(text){const el=$('visionDiagnostic');if(el)el.textContent=text;}
+async function detectCenterCrop(video,detector,threshold){
+ const vw=video.videoWidth,vh=video.videoHeight;if(!vw||!vh)return [];
+ const cw=Math.round(vw*.63),ch=Math.round(vh*.63),left=Math.round((vw-cw)/2),top=Math.round((vh-ch)/2);
+ const cv=document.createElement('canvas');cv.width=Math.min(768,cw);cv.height=Math.round(cv.width*ch/cw);
+ cv.getContext('2d').drawImage(video,left,top,cw,ch,0,0,cv.width,cv.height);
+ const all=await detector.detect(cv),sx=cw/cv.width,sy=ch/cv.height;
+ return all.filter(d=>d.score>=threshold).map(d=>({...d,bbox:[left+d.bbox[0]*sx,top+d.bbox[1]*sy,d.bbox[2]*sx,d.bbox[3]*sy],focusAssisted:true}));
+}
+async function changeHardwareZoom(direction){
+ const track=cameraStream?.getVideoTracks()?.[0];
+ if(!track?.getCapabilities||!track?.applyConstraints){respond('کیمرہ زوم دستیاب نہیں۔','Camera zoom is unavailable. Improve the light or try a nearer object, with assistance.');return;}
+ try{
+  const cap=track.getCapabilities().zoom;
+  if(!cap||typeof cap.min!=='number'){respond('یہ کیمرہ زوم نہیں دے رہا۔','This mobile camera does not offer browser zoom control.');return;}
+  const old=track.getSettings().zoom||cap.min,step=Math.max(cap.step||.1,(cap.max-cap.min)/5);
+  const value=direction==='reset'?cap.min:Math.min(cap.max,Math.max(cap.min,old+(direction==='in'?step:-step)));
+  await track.applyConstraints({advanced:[{zoom:value}]});
+  respond('کیمرہ زوم تبدیل ہو گیا ہے۔','Camera zoom changed to '+(Math.round(value*10)/10)+'. This is not a safety or distance estimate.');
+ }catch(e){respond('کیمرہ زوم تبدیل نہیں ہو سکا۔','Your browser could not change camera zoom.');}
+}
 const labels={person:'شخص',chair:'کرسی','dining table':'میز',bottle:'بوتل',cup:'کپ',book:'کتاب','cell phone':'موبائل فون',laptop:'لیپ ٹاپ',backpack:'بیگ',keyboard:'کی بورڈ',mouse:'ماؤس',car:'گاڑی',bus:'بس',dog:'کتا',cat:'بلی','potted plant':'گملے کا پودا',bench:'بینچ',handbag:'ہینڈ بیگ',bicycle:'سائیکل',clock:'گھڑی',tv:'ٹی وی',umbrella:'چھتری',apple:'سیب'};
 const posUr={left:'بائیں جانب',center:'درمیان',right:'دائیں جانب'};
 function status(t){$('resultState').textContent=t}
@@ -87,7 +110,7 @@ async function say(){
 $('speak').onclick=say;$('stop').onclick=()=>stopSpeech();
 $('speechLanguage').onchange=()=>changeLanguage($('speechLanguage').value,true);
 
-document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{if(cameraStream)stopLive(true);mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));$('readOptions').hidden=mode!=='read';$('guideOptions').hidden=mode!=='guide';const titles={look:'Look & Listen',read:'Read for Me',guide:'Campus Checkpoints'};const tips={look:'Start the camera for continuous object detection, or upload a photo.',read:'Take a close, clear photo of printed English or Urdu text.',guide:'Take a picture of one of our example QR markers.'};$('modeHeading').textContent=titles[mode];$('modeHint').textContent=tips[mode];$('analyze').textContent=mode==='guide'?'Scan checkpoint →':mode==='read'?'Read printed text →':'Analyze image →';status('Ready for live camera or photo');$('details').hidden=true;});
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{if(cameraStream)stopLive(true);if(mode!==b.dataset.mode)previousMode=mode;mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));$('readOptions').hidden=mode!=='read';$('guideOptions').hidden=mode!=='guide';const titles={look:'Look & Listen',read:'Read for Me',guide:'Campus Checkpoints'};const tips={look:'Start the camera for continuous object detection, or upload a photo.',read:'Take a close, clear photo of printed English or Urdu text.',guide:'Take a picture of one of our example QR markers.'};$('modeHeading').textContent=titles[mode];$('modeHint').textContent=tips[mode];$('analyze').textContent=mode==='guide'?'Scan checkpoint →':mode==='read'?'Read printed text →':'Analyze image →';status('Ready for live camera or photo');$('details').hidden=true;});
 $('photo').onchange=async e=>{let f=e.target.files&&e.target.files[0];if(!f)return;if(!['image/png','image/jpeg','image/webp'].includes(f.type)||f.size>8*1024*1024){alert('Choose a PNG, JPEG or WebP under 8MB');return;}const url=URL.createObjectURL(f);try{let img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});image=img;const canvas=document.createElement('canvas');const factor=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));canvas.width=Math.max(1,Math.round(img.naturalWidth*factor));canvas.height=Math.max(1,Math.round(img.naturalHeight*factor));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);$('preview').src=canvas.toDataURL('image/jpeg',.88);$('preview').style.display='block';$('analyze').disabled=false;status('Image selected');}catch(err){alert('Image could not be loaded.');}finally{URL.revokeObjectURL(url)}};
 function path(src,dest){let q=[[src]],seen=new Set([src]);while(q.length){let a=q.shift(),v=a[a.length-1];if(v===dest)return a;for(let n of paths[v]||[])if(!seen.has(n)){seen.add(n);q.push(a.concat(n))}}return null}
 async function readQR(img){const can=document.createElement('canvas');can.width=img.naturalWidth||img.videoWidth;can.height=img.naturalHeight||img.videoHeight;let cx=can.getContext('2d',{willReadFrequently:true});cx.drawImage(img,0,0);if('BarcodeDetector' in window){try{const bar=new BarcodeDetector({formats:['qr_code']});let hits=await bar.detect(can);if(hits.length)return hits[0].rawValue}catch(e){}}if(typeof jsQR==='function'){let d=cx.getImageData(0,0,can.width,can.height);let x=jsQR(d.data,d.width,d.height);if(x)return x.data;}throw Error('QR scanner unavailable or no readable QR code found. Use a sharper image.')}
@@ -181,12 +204,14 @@ function updateCameraMessage(err){
 async function startLive(){
  if(cameraStream)stopLive(true);
  const run=++liveRun;
- $('startLive').disabled=true;$('startLive').textContent='Starting camera...';status('Requesting camera permission…');
+ $('startLive').disabled=true;$('startLive').textContent='Starting camera...';status('Requesting camera permission…');mobileVisionStatus('Requesting camera permission…');
  if(!navigator.mediaDevices?.getUserMedia){updateCameraMessage({name:'Unsupported',message:'This browser does not support getUserMedia. Open the HTTPS page in Chrome or Safari.'});$('startLive').disabled=false;$('startLive').textContent='◉ Start Live Camera';return;}
  try{
-  let constraints={audio:false,video:{facingMode:{ideal:$('cameraSide').value},width:{ideal:640},height:{ideal:480},frameRate:{ideal:20,max:24}}};
+  const facing=$('cameraSide').value;
+  const constraints={audio:false,video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:15,max:24}}};
   try{cameraStream=await navigator.mediaDevices.getUserMedia(constraints)}catch(error){
-   if(error.name==='OverconstrainedError')cameraStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+   if(error.name==='OverconstrainedError'||error.name==='NotReadableError')
+    cameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:640},height:{ideal:480}},audio:false});
    else throw error;
   }
   if(run!==liveRun){cameraStream?.getTracks().forEach(t=>t.stop());return;}
@@ -195,20 +220,37 @@ async function startLive(){
   $('liveBox').hidden=false;$('liveButtons').hidden=false;$('startLive').hidden=true;
   $('cameraLabel').textContent=mode==='read'?'● LIVE · Capture text':mode==='guide'?'● LIVE · QR scanning':'● LIVE · Object detection';
   $('liveCount').textContent='Camera active';status('Camera is live');
+  lastFocusPass=0;zeroDetectionSince=0;
+  const cameraSettings=cameraStream.getVideoTracks()[0]?.getSettings?.()||{};
+  mobileVisionStatus('Camera '+(video.videoWidth||cameraSettings.width||'?')+'×'+(video.videoHeight||cameraSettings.height||'?')+
+    '. '+($('focusAssist')?.checked?'Focus assist on.':'Focus assist off.')+' Waiting for detector.');
  livePreviousSignature='';liveCandidate='';liveCandidateCount=0;liveLastSaid=0;liveClock='';liveFrameNumber=0;
  // Automatic narration defaults to on, but never override an explicit pause.
  updateNarrationStatus();
   const tracks=cameraStream.getVideoTracks();if(tracks[0])tracks[0].onended=()=>{if(cameraStream){stopLive();status('Camera was disconnected')}};
   if(mode==='look'){
    if(!window.cocoSsd||!window.tf)throw Error('Vision model libraries did not load. Connect to the internet and refresh the page.');
-   if(!detector){status('Loading AI detector. Camera is already live…');detectorPromise ||= cocoSsd.load({base:modelType}).catch(err=>{detectorPromise=null;throw err});detector=await detectorPromise;}
+   if(!detector){
+    status('Loading AI detector. Camera is already live…');
+    mobileVisionStatus('Downloading '+(modelType==='mobilenet_v2'?'detailed':'fast')+' recognition model. First load may take time on a phone.');
+    try{
+     if(window.tf?.ready)await window.tf.ready();
+     detectorPromise ||= cocoSsd.load({base:modelType}).catch(err=>{detectorPromise=null;throw err});
+     detector=await detectorPromise;
+    }catch(err){
+     if(modelType!=='lite_mobilenet_v2'){
+      modelType='lite_mobilenet_v2';$('visionModel').value=modelType;detectorPromise=null;
+      detector=await cocoSsd.load({base:modelType});
+     }else throw err;
+    }
+   }
    if(run!==liveRun)return;
    status('Live object detection active');
   }else if(mode==='guide'){status('Live QR scanning active');}
   else{status('Camera active. Tap Capture & analyze frame to read printed text.');}
   processLive(run);
  }catch(err){
-  if(run===liveRun){stopLive(true);updateCameraMessage(err);}
+  if(run===liveRun){stopLive(true);updateCameraMessage(err);mobileVisionStatus('Camera or AI failed: '+(err?.message||String(err)));}
  }
 }
 async function processLive(run){
@@ -218,8 +260,24 @@ async function processLive(run){
   const w=video.videoWidth,h=video.videoHeight;
   if(mode==='look'){
    const minScore=Number($('detectSensitivity')?.value||0.35);
-   const detections=(await detector.detect(video)).filter(d=>d.score>=minScore).sort((a,b)=>b.score-a.score).slice(0,10);
+   let detections=(await detector.detect(video)).filter(d=>d.score>=minScore).sort((a,b)=>b.score-a.score).slice(0,10);
    if(run!==liveRun)return;
+   if(!detections.length&&$('focusAssist')?.checked&&Date.now()-lastFocusPass>3500){
+    lastFocusPass=Date.now();
+    try{
+     const center=await detectCenterCrop(video,detector,Math.max(.27,minScore-.035));
+     if(run!==liveRun)return;
+     if(center.length)detections=center.sort((a,b)=>b.score-a.score).slice(0,8);
+    }catch(err){console.warn('Focus assist pass failed',err);}
+   }
+   if(!detections.length){
+    if(!zeroDetectionSince)zeroDetectionSince=Date.now();
+    if(Date.now()-zeroDetectionSince>4500)
+     mobileVisionStatus('No supported object confidently recognized. Improve lighting, hold the phone steady or center the object. This does not mean the way is clear.');
+   }else{
+    zeroDetectionSince=0;
+    if(liveFrameNumber%15===0)mobileVisionStatus((detections.some(d=>d.focusAssisted)?'Focus-assisted':'Standard')+' detection: '+detections.length+' object(s) · camera '+w+'×'+h+'.');
+   }
    recentObjects=detections.map(d=>({...d,side:(d.bbox[0]+d.bbox[2]/2)/w<.33?'left':(d.bbox[0]+d.bbox[2]/2)/w>.67?'right':'center'}));objectsAt=Date.now();
    drawDetections(detections,w,h);++liveFrameNumber;
    $('liveCount').textContent=detections.length+' object'+(detections.length===1?'':'s')+' · frame '+liveFrameNumber;
@@ -250,7 +308,7 @@ async function processLive(run){
        }
      }
    }
-   const now=Date.now();if(now-liveLastStatus>=2000){status('LIVE · Camera detecting objects');liveLastStatus=now;}
+   const now=Date.now();if(now-liveLastStatus>=2000){status(detections.length?'LIVE · '+detections.length+' object(s) recognized':'LIVE · Searching for supported objects');liveLastStatus=now;}
   }else if(mode==='guide'){
    try{
     const code=await readQR(video);if(run!==liveRun)return;
@@ -269,7 +327,7 @@ async function captureLiveFrame(){
  const data=canvas.toDataURL('image/jpeg',.91);const img=new Image();
  await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=data;});
  image=img;$('preview').src=data;$('preview').style.display='block';$('analyze').disabled=false;
- stopLive(true);await run();
+ await run(); // Keep the live camera running after a spoken photo capture.
 }
 function reportCheckpoint(code){
  const loc=code.slice('NAZARSAATHI:DEMO:'.length).toLowerCase();
@@ -285,6 +343,13 @@ $('captureFrame').onclick=captureLiveFrame;
 $('cameraSide').onchange=()=>{if(cameraStream){stopLive(true);startLive();}};
 $('cameraFillMode').onchange=()=>{const video=$('liveVideo');video.style.objectFit=$('cameraFillMode').value;if(cameraStream&&video.videoWidth)drawDetections(recentObjects,video.videoWidth,video.videoHeight);};
 window.addEventListener('resize',()=>{const video=$('liveVideo');if(cameraStream&&video.videoWidth)drawDetections(recentObjects,video.videoWidth,video.videoHeight);},{passive:true});
+if(isMobileDevice()){
+ $('detectSensitivity').value='0.28'; // Wider recall at the cost of more possible false positives.
+ mobileVisionStatus('Mobile detection ready: rear camera preferred, higher resolution requested, more results selected. These predictions can be wrong.');
+}
+$('focusAssist').onchange=()=>mobileVisionStatus($('focusAssist').checked?'Center-focused retry enabled for difficult detections.':'Focus assist off.');
+$('zoomIn').onclick=()=>changeHardwareZoom('in');
+$('zoomOut').onclick=()=>changeHardwareZoom('out');
 document.addEventListener('visibilitychange',()=>{if(document.hidden){window.speechSynthesis?.cancel();if(cameraStream)status('Camera paused while tab is hidden');}});
 
 function micStatus(s){$('micStatus').textContent=s}
@@ -458,6 +523,50 @@ function performVoiceControl(intent){
     case 'help':
       voiceAcknowledge('کہیں: سامنے کیا ہے؟ پوری تصویر دکھاؤ۔ کیمرہ فل کرو۔ سامنے والا کیمرہ۔ اردو بولو۔ لکھائی پڑھو۔ زیادہ نتائج۔ یا پچھلی سیٹنگ۔',
       'Try: what is in front of me; show entire image; fill camera frame; front camera; speak Urdu; reading mode; more detections; or undo last change.');return;
+    case 'describe':describe();return;
+    case 'startVision':
+      if(mode!=='look')voiceChangeMode('look');
+      else if(!cameraStream)startLive();
+      voiceAcknowledge('لائیو ویژن شروع ہو رہا ہے۔ میں سامنے نظر آنے والی چیزوں کے بارے میں بتاؤں گا۔','Live vision is starting. I will describe recognized objects.');
+      return;
+    case 'startReading':
+      if(mode!=='read')voiceChangeMode('read');
+      else if(!cameraStream)startLive();
+      voiceAcknowledge('لکھائی پڑھنے کا موڈ شروع ہو رہا ہے۔ کہیں: یہ پڑھو۔','Reading mode starting. Say read this while pointing the camera at text.');
+      return;
+    case 'nextMode':{
+      const modes=['look','read','guide'],next=modes[(modes.indexOf(mode)+1)%modes.length];
+      voiceChangeMode(next);voiceAcknowledge('اگلا موڈ منتخب ہو گیا۔','Next mode selected: '+next+'.');return;
+    }
+    case 'previousMode':{
+      const prior=previousMode;
+      if(prior===mode){voiceAcknowledge('پچھلا موڈ دستیاب نہیں۔','No previous mode to return to.');return;}
+      voiceChangeMode(prior);voiceAcknowledge('پچھلا موڈ بحال کر دیا ہے۔','Returned to previous mode: '+prior+'.');return;
+    }
+    case 'captureRead':{
+      // The entire action should work from one utterance on the phone.
+      // Read a live frame, or a previously selected photo when no camera is active.
+      if(cameraStream || (mode!=='read'&&$('liveVideo')?.srcObject)){
+        const changed=mode!=='read';
+        if(changed)voiceChangeMode('read');
+        // Wait for the newly selected reading camera to become playable.
+        (async()=>{
+          for(let i=0;i<32;i++){
+            if(mode!=='read')return;
+            if(cameraStream&&$('liveVideo')?.readyState>=2&&$('liveVideo').videoWidth){
+              await readByVoice($('ocrLang').value);
+              return;
+            }
+            await new Promise(resolve=>setTimeout(resolve,250));
+          }
+          voiceAcknowledge('کیمرہ ابھی تیار نہیں۔ دوبارہ کوشش کریں۔','The camera is not ready to read text. Please try again.');
+        })();
+      }else if(image){
+        if(mode!=='read')voiceChangeMode('read');
+        run();
+      }else voiceAcknowledge('متن پڑھنے کے لیے کیمرہ شروع کریں۔','Start the camera or upload a photo to read text.');
+      return;
+    }
     case 'capture':
       if(!cameraStream)voiceAcknowledge('فریم لینے کے لیے کیمرہ چلائیں۔','Start the camera before capturing a frame.');
       else captureLiveFrame();
@@ -472,7 +581,14 @@ function performVoiceControl(intent){
     case 'read':readByVoice($('ocrLang').value);return;
     case 'readUrdu':voiceSet('ocrLang','urd');readByVoice('urd');return;
    }return;
+  case 'focusAssist':
+    voiceSet('focusAssist',value==='on');
+    voiceAcknowledge(value==='on'?'چھوٹی چیزوں کے لیے اضافی مرکز والی شناخت چالو ہوئی ہے۔':'اضافی فوکس شناخت بند ہوئی ہے۔',
+      value==='on'?'Center-focused detection is enabled for difficult objects.':'Center-focused detection disabled.');return;
   case 'camera':
+    if(value==='zoomIn'||value==='zoomOut'||value==='zoomReset'){
+      changeHardwareZoom(value==='zoomIn'?'in':value==='zoomOut'?'out':'reset');return;
+    }
     if(value==='start'){if(cameraStream)voiceAcknowledge('کیمرہ پہلے ہی چل رہا ہے۔','The camera is already running.');else{startLive();voiceAcknowledge('کیمرہ شروع کیا جا رہا ہے۔','Starting the camera.');}return;}
     if(value==='stop'){if(cameraStream)stopLive();voiceAcknowledge('کیمرہ بند کر دیا گیا ہے۔','Camera stopped.');return;}
     if(value==='front'||value==='back'){

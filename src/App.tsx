@@ -169,6 +169,8 @@ export default function App() {
               <div className="live-buttons" id="liveButtons" hidden>
                 <button id="captureFrame" type="button"><FileImage size={16}/> Capture &amp; analyze</button>
                 <button id="identifyMore" type="button"><ScanSearch size={16}/> Identify more</button>
+                <button id="zoomIn" type="button" aria-label="Zoom in on the camera if supported">Zoom +</button>
+                <button id="zoomOut" type="button" aria-label="Zoom out on the camera if supported">Zoom −</button>
                 <button id="stopLive" type="button"><Square size={15}/> Stop camera</button>
               </div>
 
@@ -187,7 +189,12 @@ export default function App() {
                   </select>
                 </label>
               </div>
-              <p className="recognition-disclaimer">Detailed mode is slower. Detection supports a limited set of object types; “Identify more” gives experimental whole-image labels without positions.</p>
+              <label htmlFor="focusAssist" className="focus-assist-control">
+                 <input id="focusAssist" type="checkbox" defaultChecked />
+                 <span><ScanSearch size={18}/> <strong>Focus assist</strong> <small>When no object is found, inspect the central area more closely. Experimental; may be slower.</small></span>
+               </label>
+               <p id="visionDiagnostic" className="vision-diagnostic" aria-live="off">Camera ready. For better results, use the rear camera in good light.</p>
+               <p className="recognition-disclaimer">Mobile cameras now request higher resolution when available. Focus assist can help some small centered objects, but not every object is supported and nothing here establishes a safe path.</p>
               <div className="camera-layout-option"><label htmlFor="cameraFillMode">Camera view</label><select id="cameraFillMode" defaultValue="cover"><option value="cover">Fill frame · full width</option><option value="contain">Show entire image</option></select></div>
               <div className="live-options">
                 <label htmlFor="cameraSide" className="field-label"><ArrowLeftRight size={16}/> Camera <span className="select-box"><select id="cameraSide" defaultValue="environment"><option value="environment">Back camera</option><option value="user">Front camera</option></select><ChevronDown size={13}/></span></label>
@@ -213,7 +220,7 @@ export default function App() {
                 <div className="langRow"><label htmlFor="speechLanguage"><Globe2 size={17}/> Speaking language</label><div className="lang-select"><select id="speechLanguage" defaultValue="ur"><option value="ur">اردو · Urdu</option><option value="en">English</option></select><ChevronDown size={15}/></div></div>
                 <button id="assistantToggle" type="button" className="assistbtn" aria-pressed="false"><Mic2 size={19}/> Start Hands-Free Assistant</button>
                 <div id="micStatus" className="micstate" role="status" aria-live="polite"><span className="muted-dot"/> Microphone off. Tap once to start listening.</div>
-                <div id="voiceExamples" className="excommands"><span className="examples-title"><Sparkles size={14}/> THINGS YOU CAN SAY</span><div>“What is in front of me?”</div><div>“Where is my bottle?”</div><div>“Read this” · “Speak Urdu”</div><div>“Help”</div></div>
+                <div id="voiceExamples" className="excommands"><span className="examples-title"><Sparkles size={14}/> THINGS YOU CAN SAY</span><div>“Enable vision” · “Select reading”</div><div>“Take a picture and read”</div><div>“Zoom in” · “Focus assist on”</div><div>“Next mode” · “Previous mode”</div><div>“Help” · “Speak Urdu”</div></div>
                 <details className="voice-command-guide">
                   <summary>All voice controls / تمام وائس کمانڈز <ChevronDown size={17}/></summary>
                   <div className="voice-guide-body">
@@ -222,18 +229,18 @@ export default function App() {
                       <div lang="en">
                         <strong>English</strong>
                         <p>“Show entire image” · “Fill camera frame” · “Front camera” · “Back camera”</p>
-                        <p>“Object detection mode” · “Reading mode” · “Checkpoint mode”</p>
-                        <p>“Fast model” · “Detailed model” · “More detections” · “Balanced sensitivity”</p>
+                        <p>“Enable vision” · “Select vision” · “Start reading” · “Reading mode” · “Next mode” · “Previous mode”</p>
+                        <p>“Fast model” · “Detailed model” · “More detections” · “Focus assist on” · “Zoom in”</p>
                         <p>“Describe continuously” · “Pause descriptions” · “Speak Urdu” · “Speak English”</p>
-                        <p>“White theme” · “Dark theme” · “Read this” · “Read the results” · “Help”</p>
+                        <p>“White theme” · “Dark theme” · “Capture and analyze” · “Take a picture and read” · “Read this” · “Help”</p>
                       </div>
                       <div lang="ur" dir="rtl">
                         <strong>اردو</strong>
                         <p>”پوری تصویر دکھاؤ“ · ”کیمرہ فل کرو“ · ”فرنٹ کیمرہ“ · ”بیک کیمرہ“</p>
-                        <p>”پڑھنے کا موڈ“ · ”شناخت والا موڈ“ · ”چیک پوائنٹ موڈ“</p>
-                        <p>”تیز ماڈل“ · ”بہتر ماڈل“ · ”زیادہ چیزیں“</p>
+                        <p>”ویژن چالو“ · ”پڑھنا شروع کرو“ · ”شناخت والا موڈ“ · ”اگلا موڈ“ · ”پچھلا موڈ“</p>
+                        <p>”تیز ماڈل“ · ”بہتر ماڈل“ · ”زیادہ چیزیں“ · ”چھوٹی چیزیں تلاش“ · ”زوم بڑھاؤ“</p>
                         <p>”مسلسل بتاؤ“ · ”بتانا بند کرو“ · ”انگریزی بولو“</p>
-                        <p>”سفید تھیم“ · ”پچھلی سیٹنگ“ · ”سامنے کیا ہے؟“</p>
+                        <p>”سفید تھیم“ · ”تصویر کھینچو“ · ”کیمرے سے پڑھو“ · ”پچھلی سیٹنگ“ · ”سامنے کیا ہے؟“</p>
                       </div>
                     </div>
                     <p className="voice-guide-note">Speech recognition supports one language at a time. Say “Speak Urdu” while English is active, or “انگریزی بولو” while Urdu recognition is active. Accuracy varies by browser and network. Changes are confirmed aloud.</p>

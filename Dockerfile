@@ -4,8 +4,9 @@ COPY package*.json ./
 RUN npm install --no-audit --no-fund
 COPY index.html tsconfig.json vite.config.ts ./
 COPY src ./src
+COPY tests ./tests
 COPY public ./public
-RUN npm run build
+RUN npm run build && npm run test:voice
 
 FROM oven/bun:1.2-alpine
 WORKDIR /app
