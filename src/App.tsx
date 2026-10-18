@@ -187,6 +187,7 @@ export default function App() {
                 </label>
               </div>
               <p className="recognition-disclaimer">Detailed mode is slower. Detection supports a limited set of object types; “Identify more” gives experimental whole-image labels without positions.</p>
+              <div className="camera-layout-option"><label htmlFor="cameraFillMode">Camera view</label><select id="cameraFillMode" defaultValue="cover"><option value="cover">Fill frame · full width</option><option value="contain">Show entire image</option></select></div>
               <div className="live-options">
                 <label htmlFor="cameraSide" className="field-label"><ArrowLeftRight size={16}/> Camera <span className="select-box"><select id="cameraSide" defaultValue="environment"><option value="environment">Back camera</option><option value="user">Front camera</option></select><ChevronDown size={13}/></span></label>
                 <label htmlFor="speechLive" className="checkbox-label"><input id="speechLive" type="checkbox" defaultChecked/><span className="faux-check"><Check size={12}/></span><Volume2 size={15}/> Auto narrate</label>

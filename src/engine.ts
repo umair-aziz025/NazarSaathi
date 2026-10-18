@@ -87,16 +87,44 @@ function publishLive(ur,en,details,signature){
    say();liveLastSaid=now;livePreviousSignature=signature;
  }
 }
-function drawDetections(detections,width,height){
- const c=$('liveOverlay');if(c.width!==width||c.height!==height){c.width=width;c.height=height;}
-const v=$('liveVideo');if(v&&v.videoWidth&&v.videoHeight){const ar=v.videoWidth/v.videoHeight,box=c.getBoundingClientRect(),ratio=box.width/Math.max(1,box.height);const dw=ratio>ar?box.height*ar:box.width,dh=ratio>ar?box.height:box.width/ar;c.style.width=dw+'px';c.style.height=dh+'px';c.style.left=((box.width-dw)/2)+'px';c.style.top=((box.height-dh)/2)+'px';}
- const ctx=c.getContext('2d');ctx.clearRect(0,0,width,height);
- ctx.lineWidth=Math.max(2,width/280);ctx.font='bold '+Math.max(13,Math.round(width/36))+'px system-ui';
- for(const d of detections){
-  const [x,y,w,h]=d.bbox;ctx.strokeStyle='#41e0bf';ctx.strokeRect(x,y,w,h);
-  const label=d.class+' '+Math.round(d.score*100)+'%';const tw=ctx.measureText(label).width;
-  const boxH=Math.max(22,width/23),boxY=Math.max(0,y-boxH);ctx.fillStyle='#073b39';ctx.fillRect(x,boxY,Math.min(width-x,tw+18),boxH);
-  ctx.fillStyle='#f1fffc';ctx.fillText(label,x+8,boxY+boxH-7);
+function drawDetections(detections, sourceWidth, sourceHeight){
+ // Match object-fit exactly, including the cropping that fills a mobile camera stage.
+ const canvas=$('liveOverlay'), shell=$('liveBox'), video=$('liveVideo');
+ const surface=shell.getBoundingClientRect(), stageW=surface.width, stageH=surface.height;
+ if(!stageW||!stageH||!sourceWidth||!sourceHeight)return;
+ const dpr=Math.min(window.devicePixelRatio||1,2);
+ const pixelW=Math.max(1,Math.round(stageW*dpr)),pixelH=Math.max(1,Math.round(stageH*dpr));
+ if(canvas.width!==pixelW||canvas.height!==pixelH){canvas.width=pixelW;canvas.height=pixelH;}
+ canvas.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+ const ctx=canvas.getContext('2d');
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ ctx.clearRect(0,0,stageW,stageH);
+ const fit=$('cameraFillMode')?.value==='contain'?'contain':'cover';
+ video.style.objectFit=fit;
+ const scale=fit==='cover'?Math.max(stageW/sourceWidth,stageH/sourceHeight):Math.min(stageW/sourceWidth,stageH/sourceHeight);
+ const cropX=(stageW-sourceWidth*scale)/2,cropY=(stageH-sourceHeight*scale)/2;
+ ctx.lineWidth=Math.max(2,stageW/340);
+ ctx.lineJoin='round';ctx.font='700 '+Math.max(12,Math.min(19,stageW/34))+'px system-ui';
+ for(const detection of detections){
+   let [x,y,w,h]=detection.bbox;
+   let left=x*scale+cropX,top=y*scale+cropY,boxW=w*scale,boxH=h*scale;
+   if(left>=stageW||top>=stageH||left+boxW<=0||top+boxH<=0)continue;
+   // Only draw the part that can actually be seen in the cropped video.
+   const visibleLeft=Math.max(0,left),visibleTop=Math.max(0,top);
+   const visibleRight=Math.min(stageW,left+boxW),visibleBottom=Math.min(stageH,top+boxH);
+   const vw=visibleRight-visibleLeft,vh=visibleBottom-visibleTop;
+   if(vw<3||vh<3)continue;
+   ctx.strokeStyle='#57f1d0';ctx.shadowColor='#06443e';ctx.shadowBlur=4;
+   ctx.strokeRect(visibleLeft+1,visibleTop+1,Math.max(1,vw-2),Math.max(1,vh-2));
+   ctx.shadowBlur=0;
+   const text=detection.class+' '+Math.round(detection.score*100)+'%';
+   const labelPad=8,labelH=Math.max(23,Math.min(33,stageW/23));
+   const labelWidth=Math.min(stageW-8,ctx.measureText(text).width+labelPad*2);
+   const lx=Math.max(4,Math.min(stageW-labelWidth-4,visibleLeft));
+   // Put the label *inside* the box near top so it cannot disappear under the LIVE badge.
+   const ly=Math.max(4,Math.min(stageH-labelH-4,visibleTop+5));
+   ctx.fillStyle='#073c37e8';ctx.beginPath();ctx.roundRect(lx,ly,labelWidth,labelH,5);ctx.fill();
+   ctx.fillStyle='#f3fffa';ctx.textBaseline='middle';ctx.fillText(text,lx+labelPad,ly+labelH/2);
  }
 }
 function stopLive(silent=false){
@@ -208,6 +236,8 @@ $('startLive').onclick=startLive;
 $('stopLive').onclick=()=>stopLive();
 $('captureFrame').onclick=captureLiveFrame;
 $('cameraSide').onchange=()=>{if(cameraStream){stopLive(true);startLive();}};
+$('cameraFillMode').onchange=()=>{const video=$('liveVideo');video.style.objectFit=$('cameraFillMode').value;if(cameraStream&&video.videoWidth)drawDetections(recentObjects,video.videoWidth,video.videoHeight);};
+window.addEventListener('resize',()=>{const video=$('liveVideo');if(cameraStream&&video.videoWidth)drawDetections(recentObjects,video.videoWidth,video.videoHeight);},{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){window.speechSynthesis?.cancel();if(cameraStream)status('Camera paused while tab is hidden');}});
 
 function micStatus(s){$('micStatus').textContent=s}
